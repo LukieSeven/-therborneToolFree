@@ -24,27 +24,37 @@ export interface CharacterInput {
      * @minimum 1
      * @maximum 30
      */
-  strength: number;
+  power?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  dexterity: number;
+  vitality?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  constitution: number;
+  spirit?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  intelligence: number;
+  agility?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  wisdom: number;
+  endurance?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  precision?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  willpower?: number;
   /**
      * @minimum 1
      * @maximum 30

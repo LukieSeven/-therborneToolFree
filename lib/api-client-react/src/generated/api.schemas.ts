@@ -19,11 +19,13 @@ export interface Character {
   currentHp: number;
   armorClass: number;
   speed: number;
-  strength: number;
-  dexterity: number;
-  constitution: number;
-  intelligence: number;
-  wisdom: number;
+  power?: number;
+  vitality?: number;
+  spirit?: number;
+  agility?: number;
+  endurance?: number;
+  precision?: number;
+  willpower?: number;
   charisma: number;
   /** @nullable */
   background?: string | null;
@@ -51,27 +53,37 @@ export interface CharacterInput {
      * @minimum 1
      * @maximum 30
      */
-  strength: number;
+  power?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  dexterity: number;
+  vitality?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  constitution: number;
+  spirit?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  intelligence: number;
+  agility?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  wisdom: number;
+  endurance?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  precision?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  willpower?: number;
   /**
      * @minimum 1
      * @maximum 30
@@ -97,27 +109,37 @@ export interface CharacterUpdate {
      * @minimum 1
      * @maximum 30
      */
-  strength?: number;
+  power?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  dexterity?: number;
+  vitality?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  constitution?: number;
+  spirit?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  intelligence?: number;
+  agility?: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  wisdom?: number;
+  endurance?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  precision?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  willpower?: number;
   /**
      * @minimum 1
      * @maximum 30

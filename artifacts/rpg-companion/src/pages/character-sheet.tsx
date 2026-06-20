@@ -18,12 +18,14 @@ import { Shield, Zap, ArrowLeft, Loader2, Trash2, Heart, Plus, Minus, Dice5 } fr
 import { format } from "date-fns";
 
 const STATS = [
-  { key: "strength", label: "STR" },
-  { key: "dexterity", label: "DEX" },
-  { key: "constitution", label: "CON" },
-  { key: "intelligence", label: "INT" },
-  { key: "wisdom", label: "WIS" },
-  { key: "charisma", label: "CHA" }
+  { key: "power",     label: "POW", desc: "Physical strength & raw force" },
+  { key: "vitality",  label: "VIT", desc: "Durability & stamina" },
+  { key: "spirit",    label: "SPI", desc: "Magical energy & mana" },
+  { key: "agility",   label: "AGI", desc: "Speed & reflexes" },
+  { key: "endurance", label: "END", desc: "Resistance to pain & fatigue" },
+  { key: "precision", label: "PRE", desc: "Accuracy & critical hits" },
+  { key: "willpower", label: "WIL", desc: "Mental toughness & focus" },
+  { key: "charisma",  label: "CHA", desc: "Presence & social ability" },
 ];
 
 const DICE_TYPES = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"] as const;

@@ -16,11 +16,13 @@ export interface Character {
   currentHp: number;
   armorClass: number;
   speed: number;
-  strength: number;
-  dexterity: number;
-  constitution: number;
-  intelligence: number;
-  wisdom: number;
+  power?: number;
+  vitality?: number;
+  spirit?: number;
+  agility?: number;
+  endurance?: number;
+  precision?: number;
+  willpower?: number;
   charisma: number;
   /** @nullable */
   background?: string | null;

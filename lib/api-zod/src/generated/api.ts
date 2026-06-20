@@ -30,11 +30,13 @@ export const ListCharactersResponseItem = zod.object({
   "currentHp": zod.number(),
   "armorClass": zod.number(),
   "speed": zod.number(),
-  "strength": zod.number(),
-  "dexterity": zod.number(),
-  "constitution": zod.number(),
-  "intelligence": zod.number(),
-  "wisdom": zod.number(),
+  "power": zod.number().optional(),
+  "vitality": zod.number().optional(),
+  "spirit": zod.number().optional(),
+  "agility": zod.number().optional(),
+  "endurance": zod.number().optional(),
+  "precision": zod.number().optional(),
+  "willpower": zod.number().optional(),
   "charisma": zod.number(),
   "background": zod.string().nullish(),
   "backstory": zod.string().nullish(),
@@ -52,15 +54,19 @@ export const ListCharactersResponse = zod.array(ListCharactersResponseItem)
 
 
 
-export const createCharacterBodyStrengthMax = 30;
+export const createCharacterBodyPowerMax = 30;
 
-export const createCharacterBodyDexterityMax = 30;
+export const createCharacterBodyVitalityMax = 30;
 
-export const createCharacterBodyConstitutionMax = 30;
+export const createCharacterBodySpiritMax = 30;
 
-export const createCharacterBodyIntelligenceMax = 30;
+export const createCharacterBodyAgilityMax = 30;
 
-export const createCharacterBodyWisdomMax = 30;
+export const createCharacterBodyEnduranceMax = 30;
+
+export const createCharacterBodyPrecisionMax = 30;
+
+export const createCharacterBodyWillpowerMax = 30;
 
 export const createCharacterBodyCharismaMax = 30;
 
@@ -75,11 +81,13 @@ export const CreateCharacterBody = zod.object({
   "currentHp": zod.number(),
   "armorClass": zod.number(),
   "speed": zod.number(),
-  "strength": zod.number().min(1).max(createCharacterBodyStrengthMax),
-  "dexterity": zod.number().min(1).max(createCharacterBodyDexterityMax),
-  "constitution": zod.number().min(1).max(createCharacterBodyConstitutionMax),
-  "intelligence": zod.number().min(1).max(createCharacterBodyIntelligenceMax),
-  "wisdom": zod.number().min(1).max(createCharacterBodyWisdomMax),
+  "power": zod.number().min(1).max(createCharacterBodyPowerMax).optional(),
+  "vitality": zod.number().min(1).max(createCharacterBodyVitalityMax).optional(),
+  "spirit": zod.number().min(1).max(createCharacterBodySpiritMax).optional(),
+  "agility": zod.number().min(1).max(createCharacterBodyAgilityMax).optional(),
+  "endurance": zod.number().min(1).max(createCharacterBodyEnduranceMax).optional(),
+  "precision": zod.number().min(1).max(createCharacterBodyPrecisionMax).optional(),
+  "willpower": zod.number().min(1).max(createCharacterBodyWillpowerMax).optional(),
   "charisma": zod.number().min(1).max(createCharacterBodyCharismaMax),
   "background": zod.string().optional(),
   "backstory": zod.string().optional()
@@ -103,11 +111,13 @@ export const GetCharacterResponse = zod.object({
   "currentHp": zod.number(),
   "armorClass": zod.number(),
   "speed": zod.number(),
-  "strength": zod.number(),
-  "dexterity": zod.number(),
-  "constitution": zod.number(),
-  "intelligence": zod.number(),
-  "wisdom": zod.number(),
+  "power": zod.number().optional(),
+  "vitality": zod.number().optional(),
+  "spirit": zod.number().optional(),
+  "agility": zod.number().optional(),
+  "endurance": zod.number().optional(),
+  "precision": zod.number().optional(),
+  "willpower": zod.number().optional(),
   "charisma": zod.number(),
   "background": zod.string().nullish(),
   "backstory": zod.string().nullish(),
@@ -126,15 +136,19 @@ export const UpdateCharacterParams = zod.object({
 
 
 
-export const updateCharacterBodyStrengthMax = 30;
+export const updateCharacterBodyPowerMax = 30;
 
-export const updateCharacterBodyDexterityMax = 30;
+export const updateCharacterBodyVitalityMax = 30;
 
-export const updateCharacterBodyConstitutionMax = 30;
+export const updateCharacterBodySpiritMax = 30;
 
-export const updateCharacterBodyIntelligenceMax = 30;
+export const updateCharacterBodyAgilityMax = 30;
 
-export const updateCharacterBodyWisdomMax = 30;
+export const updateCharacterBodyEnduranceMax = 30;
+
+export const updateCharacterBodyPrecisionMax = 30;
+
+export const updateCharacterBodyWillpowerMax = 30;
 
 export const updateCharacterBodyCharismaMax = 30;
 
@@ -149,11 +163,13 @@ export const UpdateCharacterBody = zod.object({
   "currentHp": zod.number().optional(),
   "armorClass": zod.number().optional(),
   "speed": zod.number().optional(),
-  "strength": zod.number().min(1).max(updateCharacterBodyStrengthMax).optional(),
-  "dexterity": zod.number().min(1).max(updateCharacterBodyDexterityMax).optional(),
-  "constitution": zod.number().min(1).max(updateCharacterBodyConstitutionMax).optional(),
-  "intelligence": zod.number().min(1).max(updateCharacterBodyIntelligenceMax).optional(),
-  "wisdom": zod.number().min(1).max(updateCharacterBodyWisdomMax).optional(),
+  "power": zod.number().min(1).max(updateCharacterBodyPowerMax).optional(),
+  "vitality": zod.number().min(1).max(updateCharacterBodyVitalityMax).optional(),
+  "spirit": zod.number().min(1).max(updateCharacterBodySpiritMax).optional(),
+  "agility": zod.number().min(1).max(updateCharacterBodyAgilityMax).optional(),
+  "endurance": zod.number().min(1).max(updateCharacterBodyEnduranceMax).optional(),
+  "precision": zod.number().min(1).max(updateCharacterBodyPrecisionMax).optional(),
+  "willpower": zod.number().min(1).max(updateCharacterBodyWillpowerMax).optional(),
   "charisma": zod.number().min(1).max(updateCharacterBodyCharismaMax).optional(),
   "background": zod.string().optional(),
   "backstory": zod.string().optional()
@@ -169,11 +185,13 @@ export const UpdateCharacterResponse = zod.object({
   "currentHp": zod.number(),
   "armorClass": zod.number(),
   "speed": zod.number(),
-  "strength": zod.number(),
-  "dexterity": zod.number(),
-  "constitution": zod.number(),
-  "intelligence": zod.number(),
-  "wisdom": zod.number(),
+  "power": zod.number().optional(),
+  "vitality": zod.number().optional(),
+  "spirit": zod.number().optional(),
+  "agility": zod.number().optional(),
+  "endurance": zod.number().optional(),
+  "precision": zod.number().optional(),
+  "willpower": zod.number().optional(),
   "charisma": zod.number(),
   "background": zod.string().nullish(),
   "backstory": zod.string().nullish(),
