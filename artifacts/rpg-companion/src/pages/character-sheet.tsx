@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import {
   useGetCharacter,
@@ -17,18 +17,22 @@ import { Label } from "@/components/ui/label";
 import { Shield, Zap, ArrowLeft, Loader2, Trash2, Heart, Plus, Minus, Dice5 } from "lucide-react";
 import { format } from "date-fns";
 
+// Row 1: physical / Row 2: arcane/mental
 const STATS = [
   { key: "power",     label: "POW", desc: "Physical strength & raw force" },
   { key: "vitality",  label: "VIT", desc: "Durability & stamina" },
-  { key: "spirit",    label: "SPI", desc: "Magical energy & mana" },
   { key: "agility",   label: "AGI", desc: "Speed & reflexes" },
   { key: "endurance", label: "END", desc: "Resistance to pain & fatigue" },
+  { key: "spirit",    label: "SPI", desc: "Magical energy & mana" },
   { key: "precision", label: "PRE", desc: "Accuracy & critical hits" },
   { key: "willpower", label: "WIL", desc: "Mental toughness & focus" },
   { key: "charisma",  label: "CHA", desc: "Presence & social ability" },
 ];
 
-const DICE_TYPES = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"] as const;
+function getDieSize(stat: number): number {
+  if (stat <= 4) return 4;
+  return Math.ceil(stat / 2) * 2;
+}
 
 export default function CharacterSheet() {
   const params = useParams();
@@ -56,7 +60,7 @@ export default function CharacterSheet() {
   const [rollMod, setRollMod] = useState("0");
   const [rollLabel, setRollLabel] = useState("");
   const [rollingDice, setRollingDice] = useState<string | null>(null);
-  const [lastRollResult, setLastRollResult] = useState<number | null>(null);
+  const [lastRoll, setLastRoll] = useState<{ total: number; isCrit: boolean; diceType: string; result: number } | null>(null);
 
   if (isLoading) {
     return <div className="p-8 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -81,26 +85,35 @@ export default function CharacterSheet() {
 
   const handleDelete = () => {
     if (confirm("Are you sure you want to delete this character?")) {
-      deleteChar.mutate(
-        { id },
-        {
-          onSuccess: () => {
-            setLocation("/characters");
-          }
-        }
-      );
+      deleteChar.mutate({ id }, {
+        onSuccess: () => setLocation("/characters")
+      });
     }
   };
 
-  const handleRoll = (diceType: any) => {
-    setRollingDice(diceType);
-    setLastRollResult(null);
+  const handleRoll = (diceType: string, label?: string, statValue?: number) => {
+    const rollKey = label || diceType;
+    setRollingDice(rollKey);
+    setLastRoll(null);
     createRoll.mutate(
-      { id, data: { diceType, modifier: parseInt(rollMod) || 0, label: rollLabel || undefined } },
+      {
+        id,
+        data: {
+          diceType,
+          modifier: parseInt(rollMod) || 0,
+          label: label || (rollLabel || undefined),
+          ...(statValue !== undefined ? { statValue } : {}),
+        }
+      },
       {
         onSuccess: (data) => {
           setTimeout(() => {
-            setLastRollResult(data.total);
+            setLastRoll({
+              total: data.total,
+              isCrit: (data as any).isCrit ?? false,
+              diceType,
+              result: data.result,
+            });
             setRollingDice(null);
             queryClient.invalidateQueries({ queryKey: getListCharacterRollsQueryKey(id) });
             queryClient.invalidateQueries({ queryKey: ["/api/rolls/recent"] });
@@ -109,6 +122,13 @@ export default function CharacterSheet() {
         onError: () => setRollingDice(null)
       }
     );
+  };
+
+  const handleStatRoll = (statKey: string, statLabel: string) => {
+    const statValue = (character as any)[statKey] as number;
+    const dieSize = getDieSize(statValue);
+    const diceType = `d${dieSize}`;
+    handleRoll(diceType, `${statLabel} Roll`, statValue);
   };
 
   return (
@@ -124,6 +144,8 @@ export default function CharacterSheet() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
+
+          {/* Header card */}
           <Card className="bg-card border-primary/20 shadow-lg">
             <CardContent className="p-8 flex flex-col md:flex-row gap-8 items-start">
               <div className="flex-1">
@@ -148,30 +170,68 @@ export default function CharacterSheet() {
               <div className="bg-background border border-primary/30 p-6 rounded-lg shadow-inner min-w-[200px] text-center">
                 <Heart className="w-8 h-8 text-destructive mx-auto mb-2" />
                 <div className="flex items-center justify-center gap-4 mb-2">
-                  <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleUpdateHp((hp || 0) - 1)}><Minus className="w-4 h-4" /></Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleUpdateHp((hp || 0) - 1)}>
+                    <Minus className="w-4 h-4" />
+                  </Button>
                   <span className="text-4xl font-mono font-bold text-foreground">{hp}</span>
-                  <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleUpdateHp((hp || 0) + 1)}><Plus className="w-4 h-4" /></Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleUpdateHp((hp || 0) + 1)}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
                 </div>
                 <div className="w-full bg-accent h-2 rounded-full mb-1 overflow-hidden">
-                  <div className="bg-destructive h-full transition-all duration-300" style={{ width: `${Math.max(0, Math.min(100, ((hp || 0) / character.maxHp) * 100))}%` }}></div>
+                  <div
+                    className="bg-destructive h-full transition-all duration-300"
+                    style={{ width: `${Math.max(0, Math.min(100, ((hp || 0) / character.maxHp) * 100))}%` }}
+                  />
                 </div>
                 <span className="text-sm text-muted-foreground">Max HP: {character.maxHp}</span>
               </div>
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {STATS.map(stat => (
-              <div key={stat.key} className="bg-card border border-border/50 p-4 rounded-lg text-center shadow-sm">
-                <span className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-widest">{stat.label}</span>
-                <span className="block text-3xl font-serif text-foreground">{(character as any)[stat.key]}</span>
-                <div className="mt-2 text-sm font-mono text-primary bg-primary/10 rounded-full px-2 py-0.5 inline-block">
-                  +{Math.floor((character as any)[stat.key] / 3)}
-                </div>
-              </div>
-            ))}
+          {/* Stats — 4 × 2 grid, clickable */}
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-semibold">
+              Stats — click to roll
+            </p>
+            <div className="grid grid-cols-4 gap-3">
+              {STATS.map((stat) => {
+                const value = (character as any)[stat.key] as number;
+                const dieSize = getDieSize(value);
+                const mod = Math.floor(value / 3);
+                const isRolling = rollingDice === `${stat.label} Roll`;
+                return (
+                  <button
+                    key={stat.key}
+                    onClick={() => handleStatRoll(stat.key, stat.label)}
+                    disabled={!!rollingDice}
+                    title={`${stat.desc} — rolls d${dieSize}`}
+                    className={`
+                      relative bg-card border rounded-lg p-4 text-center transition-all group
+                      ${isRolling
+                        ? "border-primary bg-primary/10 animate-pulse"
+                        : "border-border/50 hover:border-primary/60 hover:bg-primary/5 hover:shadow-md cursor-pointer"
+                      }
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                    `}
+                  >
+                    <span className="block text-xs font-bold text-muted-foreground mb-1 uppercase tracking-widest group-hover:text-primary transition-colors">
+                      {stat.label}
+                    </span>
+                    <span className="block text-3xl font-serif text-foreground">{value}</span>
+                    <div className="mt-2 text-xs font-mono text-primary bg-primary/10 rounded-full px-2 py-0.5 inline-block">
+                      +{mod}
+                    </div>
+                    <div className="mt-1 text-[10px] text-muted-foreground font-mono opacity-60">
+                      d{dieSize}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
+          {/* Background & Backstory */}
           <Card className="bg-card border-border/50">
             <CardHeader>
               <CardTitle className="font-serif">Background & Backstory</CardTitle>
@@ -191,32 +251,48 @@ export default function CharacterSheet() {
           </Card>
         </div>
 
+        {/* Right column: dice roller + roll history */}
         <div className="space-y-8">
           <Card className="bg-card border-primary/30 shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50"></div>
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
             <CardHeader>
               <CardTitle className="font-serif flex items-center text-primary">
                 <Dice5 className="w-5 h-5 mr-2" /> Roll the Dice
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              <p className="text-xs text-muted-foreground font-serif italic">
+                Click any stat to roll, or pick a die below.
+              </p>
+
               <div className="flex gap-4">
                 <div className="flex-1">
                   <Label className="text-xs uppercase text-muted-foreground mb-1 block">Label (Optional)</Label>
-                  <Input value={rollLabel} onChange={e => setRollLabel(e.target.value)} placeholder="e.g. Perception" className="bg-background/50 border-border/50" />
+                  <Input
+                    value={rollLabel}
+                    onChange={e => setRollLabel(e.target.value)}
+                    placeholder="e.g. Perception"
+                    className="bg-background/50 border-border/50"
+                  />
                 </div>
                 <div className="w-24">
                   <Label className="text-xs uppercase text-muted-foreground mb-1 block">Modifier</Label>
-                  <Input type="number" value={rollMod} onChange={e => setRollMod(e.target.value)} className="bg-background/50 border-border/50 text-center font-mono" />
+                  <Input
+                    type="number"
+                    value={rollMod}
+                    onChange={e => setRollMod(e.target.value)}
+                    className="bg-background/50 border-border/50 text-center font-mono"
+                  />
                 </div>
               </div>
 
+              {/* Manual die buttons */}
               <div className="grid grid-cols-4 gap-2">
-                {DICE_TYPES.map(d => (
+                {(["d4","d6","d8","d10","d12","d20","d100"] as const).map(d => (
                   <Button
                     key={d}
                     variant="outline"
-                    className={`font-mono font-bold ${rollingDice === d ? 'animate-pulse bg-primary/20 border-primary' : 'bg-background hover:border-primary/50'}`}
+                    className={`font-mono font-bold text-xs ${rollingDice === d ? "animate-pulse bg-primary/20 border-primary" : "bg-background hover:border-primary/50"}`}
                     disabled={!!rollingDice}
                     onClick={() => handleRoll(d)}
                   >
@@ -225,13 +301,28 @@ export default function CharacterSheet() {
                 ))}
               </div>
 
-              <div className="mt-8 p-6 border-2 border-dashed border-border/50 rounded-lg text-center relative min-h-[120px] flex items-center justify-center">
+              {/* Result display */}
+              <div className="mt-8 p-6 border-2 border-dashed border-border/50 rounded-lg text-center relative min-h-[130px] flex flex-col items-center justify-center">
                 {rollingDice ? (
                   <Dice5 className="w-12 h-12 animate-spin text-primary opacity-50" />
-                ) : lastRollResult !== null ? (
-                  <div className="animate-in zoom-in duration-300">
-                    <span className="text-sm text-muted-foreground block mb-1 uppercase tracking-widest">Result</span>
-                    <span className="text-6xl font-serif font-bold text-primary">{lastRollResult}</span>
+                ) : lastRoll ? (
+                  <div className="animate-in zoom-in duration-300 space-y-1">
+                    {lastRoll.isCrit && (
+                      <span className="text-xs font-bold tracking-widest uppercase text-yellow-500 animate-in fade-in">
+                        Critical Hit!
+                      </span>
+                    )}
+                    <div>
+                      <span className="text-sm text-muted-foreground block uppercase tracking-widest">Total</span>
+                      <span className={`text-6xl font-serif font-bold ${lastRoll.isCrit ? "text-yellow-500" : "text-primary"}`}>
+                        {lastRoll.total}
+                      </span>
+                    </div>
+                    {lastRoll.isCrit && (
+                      <p className="text-xs text-muted-foreground font-mono">
+                        stat cap + bonus roll
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <span className="text-muted-foreground text-sm font-serif italic">The dice await your command.</span>
@@ -240,6 +331,7 @@ export default function CharacterSheet() {
             </CardContent>
           </Card>
 
+          {/* Roll History */}
           <Card className="bg-card border-border/50">
             <CardHeader className="py-4 border-b border-border/30">
               <CardTitle className="font-serif text-sm">Roll History</CardTitle>
@@ -252,13 +344,20 @@ export default function CharacterSheet() {
                   {rolls.map(roll => (
                     <div key={roll.id} className="p-3 hover:bg-accent/20 transition-colors flex justify-between items-center">
                       <div>
-                        <div className="font-medium text-sm text-foreground">{roll.label || "Untyped Roll"}</div>
+                        <div className="font-medium text-sm text-foreground flex items-center gap-1">
+                          {roll.label || "Untyped Roll"}
+                          {(roll as any).isCrit && (
+                            <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">crit</span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground font-mono">
                           {roll.diceType}{roll.modifier ? (roll.modifier > 0 ? `+${roll.modifier}` : roll.modifier) : ""}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-serif font-bold text-primary">{roll.total}</div>
+                        <div className={`text-lg font-serif font-bold ${(roll as any).isCrit ? "text-yellow-500" : "text-primary"}`}>
+                          {roll.total}
+                        </div>
                         <div className="text-[10px] text-muted-foreground">{format(new Date(roll.rolledAt), "HH:mm")}</div>
                       </div>
                     </div>

@@ -19,6 +19,5 @@ export * from './noteUpdateCategory';
 export * from './roll';
 export * from './rollDiceType';
 export * from './rollInput';
-export * from './rollInputDiceType';
 export * from './rollWithCharacter';
 export * from './rollWithCharacterDiceType';

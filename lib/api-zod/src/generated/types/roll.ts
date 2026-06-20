@@ -17,5 +17,9 @@ export interface Roll {
   total?: number;
   /** @nullable */
   label?: string | null;
+  /** @nullable */
+  isCrit?: boolean | null;
+  /** @nullable */
+  critBonus?: number | null;
   rolledAt: Date;
 }

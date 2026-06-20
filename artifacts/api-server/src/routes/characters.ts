@@ -138,24 +138,47 @@ router.post("/characters/:id/rolls", async (req, res): Promise<void> => {
     return;
   }
 
-  const diceSides: Record<string, number> = {
-    d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100,
-  };
+  // Derive die size from diceType string (e.g. "d12" → 12)
+  const diceTypeStr = parsed.data.diceType;
+  const sides = parseInt(diceTypeStr.replace("d", ""), 10) || 20;
 
-  const sides = diceSides[parsed.data.diceType];
-  const result = Math.floor(Math.random() * sides) + 1;
+  const rollResult = Math.floor(Math.random() * sides) + 1;
   const modifier = parsed.data.modifier ?? 0;
-  const total = result + modifier;
+  const statValue = (parsed.data as any).statValue as number | undefined;
+
+  let result = rollResult;
+  let total: number;
+  let isCrit = false;
+  let critBonus: number | null = null;
+
+  if (statValue !== undefined) {
+    // Stat-based roll: crit when roll exceeds the stat cap
+    if (rollResult > statValue) {
+      // Critical hit — roll again and add to stat cap
+      isCrit = true;
+      const secondRoll = Math.floor(Math.random() * sides) + 1;
+      critBonus = secondRoll;
+      result = statValue;
+      total = statValue + secondRoll + modifier;
+    } else {
+      result = rollResult;
+      total = rollResult + modifier;
+    }
+  } else {
+    total = rollResult + modifier;
+  }
 
   const [roll] = await db
     .insert(rollsTable)
     .values({
       characterId: params.data.id,
-      diceType: parsed.data.diceType,
+      diceType: diceTypeStr,
       result,
       modifier: parsed.data.modifier ?? null,
       total,
       label: parsed.data.label ?? null,
+      isCrit,
+      critBonus,
     })
     .returning();
 

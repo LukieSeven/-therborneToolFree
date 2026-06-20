@@ -18,5 +18,9 @@ export interface RollWithCharacter {
   total: number;
   /** @nullable */
   label?: string | null;
+  /** @nullable */
+  isCrit?: boolean | null;
+  /** @nullable */
+  critBonus?: number | null;
   rolledAt: Date;
 }

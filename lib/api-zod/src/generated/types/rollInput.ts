@@ -5,10 +5,11 @@
  * RPG Companion API
  * OpenAPI spec version: 0.1.0
  */
-import type { RollInputDiceType } from './rollInputDiceType';
 
 export interface RollInput {
-  diceType: RollInputDiceType;
+  diceType: string;
   modifier?: number;
   label?: string;
+  /** When provided, server uses this to determine crit threshold */
+  statValue?: number;
 }

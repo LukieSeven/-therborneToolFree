@@ -223,6 +223,8 @@ export const ListCharacterRollsResponseItem = zod.object({
   "modifier": zod.number().nullish(),
   "total": zod.number().optional(),
   "label": zod.string().nullish(),
+  "isCrit": zod.boolean().nullish(),
+  "critBonus": zod.number().nullish(),
   "rolledAt": zod.coerce.date()
 })
 export const ListCharacterRollsResponse = zod.array(ListCharacterRollsResponseItem)
@@ -236,9 +238,10 @@ export const CreateRollParams = zod.object({
 })
 
 export const CreateRollBody = zod.object({
-  "diceType": zod.enum(['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']),
+  "diceType": zod.string(),
   "modifier": zod.number().optional(),
-  "label": zod.string().optional()
+  "label": zod.string().optional(),
+  "statValue": zod.number().optional().describe('When provided, server uses this to determine crit threshold')
 })
 
 
@@ -254,6 +257,8 @@ export const ListRecentRollsResponseItem = zod.object({
   "modifier": zod.number().nullish(),
   "total": zod.number(),
   "label": zod.string().nullish(),
+  "isCrit": zod.boolean().nullish(),
+  "critBonus": zod.number().nullish(),
   "rolledAt": zod.coerce.date()
 })
 export const ListRecentRollsResponse = zod.array(ListRecentRollsResponseItem)

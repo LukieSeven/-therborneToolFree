@@ -510,6 +510,10 @@ components:
           type: integer
         label:
           type: ["string", "null"]
+        isCrit:
+          type: ["boolean", "null"]
+        critBonus:
+          type: ["integer", "null"]
         rolledAt:
           type: string
           format: date-time
@@ -521,11 +525,13 @@ components:
       properties:
         diceType:
           type: string
-          enum: [d4, d6, d8, d10, d12, d20, d100]
         modifier:
           type: integer
         label:
           type: string
+        statValue:
+          type: integer
+          description: When provided, server uses this to determine crit threshold
 
     RollWithCharacter:
       type: object
@@ -555,6 +561,10 @@ components:
           type: integer
         label:
           type: ["string", "null"]
+        isCrit:
+          type: ["boolean", "null"]
+        critBonus:
+          type: ["integer", "null"]
         rolledAt:
           type: string
           format: date-time

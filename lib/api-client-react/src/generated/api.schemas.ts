@@ -172,26 +172,19 @@ export interface Roll {
   total?: number;
   /** @nullable */
   label?: string | null;
+  /** @nullable */
+  isCrit?: boolean | null;
+  /** @nullable */
+  critBonus?: number | null;
   rolledAt: string;
 }
 
-export type RollInputDiceType = typeof RollInputDiceType[keyof typeof RollInputDiceType];
-
-
-export const RollInputDiceType = {
-  d4: 'd4',
-  d6: 'd6',
-  d8: 'd8',
-  d10: 'd10',
-  d12: 'd12',
-  d20: 'd20',
-  d100: 'd100',
-} as const;
-
 export interface RollInput {
-  diceType: RollInputDiceType;
+  diceType: string;
   modifier?: number;
   label?: string;
+  /** When provided, server uses this to determine crit threshold */
+  statValue?: number;
 }
 
 export type RollWithCharacterDiceType = typeof RollWithCharacterDiceType[keyof typeof RollWithCharacterDiceType];
@@ -218,6 +211,10 @@ export interface RollWithCharacter {
   total: number;
   /** @nullable */
   label?: string | null;
+  /** @nullable */
+  isCrit?: boolean | null;
+  /** @nullable */
+  critBonus?: number | null;
   rolledAt: string;
 }
 
