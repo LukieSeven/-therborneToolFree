@@ -1,15 +1,20 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: RPG Companion API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: characters
+    description: Character management
+  - name: rolls
+    description: Dice roll operations
+  - name: notes
+    description: Campaign notes
 paths:
   /healthz:
     get:
@@ -24,6 +29,252 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /characters:
+    get:
+      operationId: listCharacters
+      tags: [characters]
+      summary: List all characters
+      responses:
+        "200":
+          description: List of characters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Character"
+    post:
+      operationId: createCharacter
+      tags: [characters]
+      summary: Create a character
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CharacterInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Character"
+
+  /characters/{id}:
+    get:
+      operationId: getCharacter
+      tags: [characters]
+      summary: Get a character
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Character
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Character"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCharacter
+      tags: [characters]
+      summary: Update a character
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CharacterUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Character"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteCharacter
+      tags: [characters]
+      summary: Delete a character
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /characters/{id}/rolls:
+    get:
+      operationId: listCharacterRolls
+      tags: [rolls]
+      summary: Get roll history for a character
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Roll history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Roll"
+    post:
+      operationId: createRoll
+      tags: [rolls]
+      summary: Roll dice for a character
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RollInput"
+      responses:
+        "201":
+          description: Roll result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Roll"
+
+  /rolls/recent:
+    get:
+      operationId: listRecentRolls
+      tags: [rolls]
+      summary: Get recent rolls across all characters
+      responses:
+        "200":
+          description: Recent rolls
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RollWithCharacter"
+
+  /notes:
+    get:
+      operationId: listNotes
+      tags: [notes]
+      summary: List all notes
+      responses:
+        "200":
+          description: Notes list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Note"
+    post:
+      operationId: createNote
+      tags: [notes]
+      summary: Create a note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoteInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+
+  /notes/{id}:
+    get:
+      operationId: getNote
+      tags: [notes]
+      summary: Get a note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateNote
+      tags: [notes]
+      summary: Update a note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoteUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteNote
+      tags: [notes]
+      summary: Delete a note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +285,322 @@ components:
       required:
         - status
 
+    Character:
+      type: object
+      required:
+        - id
+        - name
+        - className
+        - race
+        - level
+        - maxHp
+        - currentHp
+        - armorClass
+        - speed
+        - strength
+        - dexterity
+        - constitution
+        - intelligence
+        - wisdom
+        - charisma
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        className:
+          type: string
+        race:
+          type: string
+        level:
+          type: integer
+        maxHp:
+          type: integer
+        currentHp:
+          type: integer
+        armorClass:
+          type: integer
+        speed:
+          type: integer
+        strength:
+          type: integer
+        dexterity:
+          type: integer
+        constitution:
+          type: integer
+        intelligence:
+          type: integer
+        wisdom:
+          type: integer
+        charisma:
+          type: integer
+        background:
+          type: ["string", "null"]
+        backstory:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CharacterInput:
+      type: object
+      required:
+        - name
+        - className
+        - race
+        - level
+        - maxHp
+        - currentHp
+        - armorClass
+        - speed
+        - strength
+        - dexterity
+        - constitution
+        - intelligence
+        - wisdom
+        - charisma
+      properties:
+        name:
+          type: string
+          minLength: 1
+        className:
+          type: string
+          minLength: 1
+        race:
+          type: string
+          minLength: 1
+        level:
+          type: integer
+          minimum: 1
+        maxHp:
+          type: integer
+          minimum: 1
+        currentHp:
+          type: integer
+        armorClass:
+          type: integer
+        speed:
+          type: integer
+        strength:
+          type: integer
+          minimum: 1
+          maximum: 30
+        dexterity:
+          type: integer
+          minimum: 1
+          maximum: 30
+        constitution:
+          type: integer
+          minimum: 1
+          maximum: 30
+        intelligence:
+          type: integer
+          minimum: 1
+          maximum: 30
+        wisdom:
+          type: integer
+          minimum: 1
+          maximum: 30
+        charisma:
+          type: integer
+          minimum: 1
+          maximum: 30
+        background:
+          type: string
+        backstory:
+          type: string
+
+    CharacterUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        className:
+          type: string
+        race:
+          type: string
+        level:
+          type: integer
+          minimum: 1
+        maxHp:
+          type: integer
+          minimum: 1
+        currentHp:
+          type: integer
+        armorClass:
+          type: integer
+        speed:
+          type: integer
+        strength:
+          type: integer
+          minimum: 1
+          maximum: 30
+        dexterity:
+          type: integer
+          minimum: 1
+          maximum: 30
+        constitution:
+          type: integer
+          minimum: 1
+          maximum: 30
+        intelligence:
+          type: integer
+          minimum: 1
+          maximum: 30
+        wisdom:
+          type: integer
+          minimum: 1
+          maximum: 30
+        charisma:
+          type: integer
+          minimum: 1
+          maximum: 30
+        background:
+          type: string
+        backstory:
+          type: string
+
+    Roll:
+      type: object
+      required:
+        - id
+        - characterId
+        - diceType
+        - result
+        - rolledAt
+      properties:
+        id:
+          type: integer
+        characterId:
+          type: integer
+        diceType:
+          type: string
+          enum: [d4, d6, d8, d10, d12, d20, d100]
+        result:
+          type: integer
+        modifier:
+          type: ["integer", "null"]
+        total:
+          type: integer
+        label:
+          type: ["string", "null"]
+        rolledAt:
+          type: string
+          format: date-time
+
+    RollInput:
+      type: object
+      required:
+        - diceType
+      properties:
+        diceType:
+          type: string
+          enum: [d4, d6, d8, d10, d12, d20, d100]
+        modifier:
+          type: integer
+        label:
+          type: string
+
+    RollWithCharacter:
+      type: object
+      required:
+        - id
+        - characterId
+        - characterName
+        - diceType
+        - result
+        - total
+        - rolledAt
+      properties:
+        id:
+          type: integer
+        characterId:
+          type: integer
+        characterName:
+          type: string
+        diceType:
+          type: string
+          enum: [d4, d6, d8, d10, d12, d20, d100]
+        result:
+          type: integer
+        modifier:
+          type: ["integer", "null"]
+        total:
+          type: integer
+        label:
+          type: ["string", "null"]
+        rolledAt:
+          type: string
+          format: date-time
+
+    Note:
+      type: object
+      required:
+        - id
+        - title
+        - content
+        - category
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        category:
+          type: string
+          enum: [location, npc, item, lore, general]
+        tags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    NoteInput:
+      type: object
+      required:
+        - title
+        - content
+        - category
+      properties:
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+        category:
+          type: string
+          enum: [location, npc, item, lore, general]
+        tags:
+          type: array
+          items:
+            type: string
+
+    NoteUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+        category:
+          type: string
+          enum: [location, npc, item, lore, general]
+        tags:
+          type: array
+          items:
+            type: string
