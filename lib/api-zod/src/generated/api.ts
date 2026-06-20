@@ -28,15 +28,16 @@ export const ListCharactersResponseItem = zod.object({
   "level": zod.number(),
   "maxHp": zod.number(),
   "currentHp": zod.number(),
-  "armorClass": zod.number(),
+  "dtBonus": zod.number().describe('Flat DT bonus from armor\/shields'),
+  "currentDt": zod.number().describe('Current Damage Threshold (degrades in combat)'),
   "speed": zod.number(),
-  "power": zod.number().optional(),
-  "vitality": zod.number().optional(),
-  "spirit": zod.number().optional(),
-  "agility": zod.number().optional(),
-  "endurance": zod.number().optional(),
-  "precision": zod.number().optional(),
-  "willpower": zod.number().optional(),
+  "power": zod.number(),
+  "vitality": zod.number(),
+  "spirit": zod.number(),
+  "agility": zod.number(),
+  "endurance": zod.number(),
+  "precision": zod.number(),
+  "willpower": zod.number(),
   "charisma": zod.number(),
   "background": zod.string().nullish(),
   "backstory": zod.string().nullish(),
@@ -79,15 +80,15 @@ export const CreateCharacterBody = zod.object({
   "level": zod.number().min(1),
   "maxHp": zod.number().min(1),
   "currentHp": zod.number(),
-  "armorClass": zod.number(),
+  "dtBonus": zod.number().optional().describe('Flat DT bonus from armor\/shields'),
   "speed": zod.number(),
-  "power": zod.number().min(1).max(createCharacterBodyPowerMax).optional(),
-  "vitality": zod.number().min(1).max(createCharacterBodyVitalityMax).optional(),
-  "spirit": zod.number().min(1).max(createCharacterBodySpiritMax).optional(),
-  "agility": zod.number().min(1).max(createCharacterBodyAgilityMax).optional(),
-  "endurance": zod.number().min(1).max(createCharacterBodyEnduranceMax).optional(),
-  "precision": zod.number().min(1).max(createCharacterBodyPrecisionMax).optional(),
-  "willpower": zod.number().min(1).max(createCharacterBodyWillpowerMax).optional(),
+  "power": zod.number().min(1).max(createCharacterBodyPowerMax),
+  "vitality": zod.number().min(1).max(createCharacterBodyVitalityMax),
+  "spirit": zod.number().min(1).max(createCharacterBodySpiritMax),
+  "agility": zod.number().min(1).max(createCharacterBodyAgilityMax),
+  "endurance": zod.number().min(1).max(createCharacterBodyEnduranceMax),
+  "precision": zod.number().min(1).max(createCharacterBodyPrecisionMax),
+  "willpower": zod.number().min(1).max(createCharacterBodyWillpowerMax),
   "charisma": zod.number().min(1).max(createCharacterBodyCharismaMax),
   "background": zod.string().optional(),
   "backstory": zod.string().optional()
@@ -109,15 +110,16 @@ export const GetCharacterResponse = zod.object({
   "level": zod.number(),
   "maxHp": zod.number(),
   "currentHp": zod.number(),
-  "armorClass": zod.number(),
+  "dtBonus": zod.number().describe('Flat DT bonus from armor\/shields'),
+  "currentDt": zod.number().describe('Current Damage Threshold (degrades in combat)'),
   "speed": zod.number(),
-  "power": zod.number().optional(),
-  "vitality": zod.number().optional(),
-  "spirit": zod.number().optional(),
-  "agility": zod.number().optional(),
-  "endurance": zod.number().optional(),
-  "precision": zod.number().optional(),
-  "willpower": zod.number().optional(),
+  "power": zod.number(),
+  "vitality": zod.number(),
+  "spirit": zod.number(),
+  "agility": zod.number(),
+  "endurance": zod.number(),
+  "precision": zod.number(),
+  "willpower": zod.number(),
   "charisma": zod.number(),
   "background": zod.string().nullish(),
   "backstory": zod.string().nullish(),
@@ -161,7 +163,8 @@ export const UpdateCharacterBody = zod.object({
   "level": zod.number().min(1).optional(),
   "maxHp": zod.number().min(1).optional(),
   "currentHp": zod.number().optional(),
-  "armorClass": zod.number().optional(),
+  "dtBonus": zod.number().optional().describe('Flat DT bonus from armor\/shields'),
+  "currentDt": zod.number().optional().describe('Current Damage Threshold'),
   "speed": zod.number().optional(),
   "power": zod.number().min(1).max(updateCharacterBodyPowerMax).optional(),
   "vitality": zod.number().min(1).max(updateCharacterBodyVitalityMax).optional(),
@@ -183,15 +186,16 @@ export const UpdateCharacterResponse = zod.object({
   "level": zod.number(),
   "maxHp": zod.number(),
   "currentHp": zod.number(),
-  "armorClass": zod.number(),
+  "dtBonus": zod.number().describe('Flat DT bonus from armor\/shields'),
+  "currentDt": zod.number().describe('Current Damage Threshold (degrades in combat)'),
   "speed": zod.number(),
-  "power": zod.number().optional(),
-  "vitality": zod.number().optional(),
-  "spirit": zod.number().optional(),
-  "agility": zod.number().optional(),
-  "endurance": zod.number().optional(),
-  "precision": zod.number().optional(),
-  "willpower": zod.number().optional(),
+  "power": zod.number(),
+  "vitality": zod.number(),
+  "spirit": zod.number(),
+  "agility": zod.number(),
+  "endurance": zod.number(),
+  "precision": zod.number(),
+  "willpower": zod.number(),
   "charisma": zod.number(),
   "background": zod.string().nullish(),
   "backstory": zod.string().nullish(),
@@ -205,6 +209,30 @@ export const UpdateCharacterResponse = zod.object({
  */
 export const DeleteCharacterParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Apply incoming damage using DT rules
+ */
+export const ApplyDamageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const applyDamageBodyAmountMin = 0;
+
+
+
+export const ApplyDamageBody = zod.object({
+  "amount": zod.number().min(applyDamageBodyAmountMin).describe('Incoming damage amount')
+})
+
+export const ApplyDamageResponse = zod.object({
+  "dtDropped": zod.boolean(),
+  "hpLost": zod.number(),
+  "newDt": zod.number(),
+  "newHp": zod.number(),
+  "absorbed": zod.boolean().describe('True if DT fully absorbed the damage (no HP lost)')
 })
 
 

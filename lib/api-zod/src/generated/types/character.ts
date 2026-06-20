@@ -14,15 +14,18 @@ export interface Character {
   level: number;
   maxHp: number;
   currentHp: number;
-  armorClass: number;
+  /** Flat DT bonus from armor/shields */
+  dtBonus: number;
+  /** Current Damage Threshold (degrades in combat) */
+  currentDt: number;
   speed: number;
-  power?: number;
-  vitality?: number;
-  spirit?: number;
-  agility?: number;
-  endurance?: number;
-  precision?: number;
-  willpower?: number;
+  power: number;
+  vitality: number;
+  spirit: number;
+  agility: number;
+  endurance: number;
+  precision: number;
+  willpower: number;
   charisma: number;
   /** @nullable */
   background?: string | null;

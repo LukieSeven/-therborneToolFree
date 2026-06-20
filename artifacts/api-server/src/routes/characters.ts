@@ -14,6 +14,8 @@ import {
   ListCharacterRollsResponse,
   CreateRollParams,
   CreateRollBody,
+  ApplyDamageParams,
+  ApplyDamageBody,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -106,6 +108,59 @@ router.delete("/characters/:id", async (req, res): Promise<void> => {
   }
 
   res.sendStatus(204);
+});
+
+router.post("/characters/:id/apply-damage", async (req, res): Promise<void> => {
+  const params = ApplyDamageParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const parsed = ApplyDamageBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const [character] = await db
+    .select()
+    .from(charactersTable)
+    .where(eq(charactersTable.id, params.data.id));
+
+  if (!character) {
+    res.status(404).json({ error: "Character not found" });
+    return;
+  }
+
+  const { amount } = parsed.data;
+  const maxDt = character.endurance * 2 + character.dtBonus;
+  const dt = character.currentDt;
+
+  let newDt = dt;
+  let hpLost = 0;
+  let dtDropped = false;
+  let absorbed = false;
+
+  if (amount >= dt) {
+    // DT drops by 1, overflow damages HP
+    newDt = Math.max(0, dt - 1);
+    dtDropped = true;
+    const overflow = amount - dt;
+    hpLost = overflow;
+  } else {
+    // Damage fully absorbed, DT holds
+    absorbed = true;
+  }
+
+  const newHp = Math.max(0, character.currentHp - hpLost);
+
+  await db
+    .update(charactersTable)
+    .set({ currentDt: newDt, currentHp: newHp, updatedAt: new Date() })
+    .where(eq(charactersTable.id, params.data.id));
+
+  res.json({ dtDropped, hpLost, newDt, newHp, absorbed, maxDt });
 });
 
 router.get("/characters/:id/rolls", async (req, res): Promise<void> => {

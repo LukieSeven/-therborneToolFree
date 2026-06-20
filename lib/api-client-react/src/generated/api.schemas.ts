@@ -17,15 +17,18 @@ export interface Character {
   level: number;
   maxHp: number;
   currentHp: number;
-  armorClass: number;
+  /** Flat DT bonus from armor/shields */
+  dtBonus: number;
+  /** Current Damage Threshold (degrades in combat) */
+  currentDt: number;
   speed: number;
-  power?: number;
-  vitality?: number;
-  spirit?: number;
-  agility?: number;
-  endurance?: number;
-  precision?: number;
-  willpower?: number;
+  power: number;
+  vitality: number;
+  spirit: number;
+  agility: number;
+  endurance: number;
+  precision: number;
+  willpower: number;
   charisma: number;
   /** @nullable */
   background?: string | null;
@@ -47,43 +50,44 @@ export interface CharacterInput {
   /** @minimum 1 */
   maxHp: number;
   currentHp: number;
-  armorClass: number;
+  /** Flat DT bonus from armor/shields */
+  dtBonus?: number;
   speed: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  power?: number;
+  power: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  vitality?: number;
+  vitality: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  spirit?: number;
+  spirit: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  agility?: number;
+  agility: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  endurance?: number;
+  endurance: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  precision?: number;
+  precision: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  willpower?: number;
+  willpower: number;
   /**
      * @minimum 1
      * @maximum 30
@@ -103,7 +107,10 @@ export interface CharacterUpdate {
   /** @minimum 1 */
   maxHp?: number;
   currentHp?: number;
-  armorClass?: number;
+  /** Flat DT bonus from armor/shields */
+  dtBonus?: number;
+  /** Current Damage Threshold */
+  currentDt?: number;
   speed?: number;
   /**
      * @minimum 1
@@ -147,6 +154,23 @@ export interface CharacterUpdate {
   charisma?: number;
   background?: string;
   backstory?: string;
+}
+
+export interface DamageInput {
+  /**
+     * Incoming damage amount
+     * @minimum 0
+     */
+  amount: number;
+}
+
+export interface DamageResult {
+  dtDropped: boolean;
+  hpLost: number;
+  newDt: number;
+  newHp: number;
+  /** True if DT fully absorbed the damage (no HP lost) */
+  absorbed: boolean;
 }
 
 export type RollDiceType = typeof RollDiceType[keyof typeof RollDiceType];

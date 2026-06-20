@@ -53,10 +53,10 @@ export default function Characters() {
                     </div>
                     <div className="text-center border-l border-border/50">
                       <div className="text-xs text-muted-foreground uppercase flex items-center justify-center gap-1 mb-1">
-                        <Shield className="w-3 h-3" /> AC
+                        <Shield className="w-3 h-3" /> DT
                       </div>
                       <div className="font-mono font-bold text-foreground">
-                        {char.armorClass}
+                        {char.currentDt}
                       </div>
                     </div>
                     <div className="text-center border-l border-border/50">

@@ -16,7 +16,10 @@ export interface CharacterUpdate {
   /** @minimum 1 */
   maxHp?: number;
   currentHp?: number;
-  armorClass?: number;
+  /** Flat DT bonus from armor/shields */
+  dtBonus?: number;
+  /** Current Damage Threshold */
+  currentDt?: number;
   speed?: number;
   /**
      * @minimum 1

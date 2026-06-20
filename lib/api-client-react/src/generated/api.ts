@@ -23,6 +23,8 @@ import type {
   Character,
   CharacterInput,
   CharacterUpdate,
+  DamageInput,
+  DamageResult,
   HealthStatus,
   Note,
   NoteInput,
@@ -487,6 +489,78 @@ export const useDeleteCharacter = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeleteCharacterMutationOptions(options));
+    }
+
+export const getApplyDamageUrl = (id: number,) => {
+
+
+
+
+  return `/api/characters/${id}/apply-damage`
+}
+
+/**
+ * @summary Apply incoming damage using DT rules
+ */
+export const applyDamage = async (id: number,
+    damageInput: DamageInput, options?: RequestInit): Promise<DamageResult> => {
+
+  return customFetch<DamageResult>(getApplyDamageUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      damageInput,)
+  }
+);}
+
+
+
+
+export const getApplyDamageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyDamage>>, TError,{id: number;data: BodyType<DamageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof applyDamage>>, TError,{id: number;data: BodyType<DamageInput>}, TContext> => {
+
+const mutationKey = ['applyDamage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyDamage>>, {id: number;data: BodyType<DamageInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  applyDamage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyDamageMutationResult = NonNullable<Awaited<ReturnType<typeof applyDamage>>>
+    export type ApplyDamageMutationBody = BodyType<DamageInput>
+    export type ApplyDamageMutationError = ErrorType<void>
+
+    /**
+ * @summary Apply incoming damage using DT rules
+ */
+export const useApplyDamage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyDamage>>, TError,{id: number;data: BodyType<DamageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof applyDamage>>,
+        TError,
+        {id: number;data: BodyType<DamageInput>},
+        TContext
+      > => {
+      return useMutation(getApplyDamageMutationOptions(options));
     }
 
 export const getListCharacterRollsUrl = (id: number,) => {

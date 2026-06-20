@@ -18,43 +18,44 @@ export interface CharacterInput {
   /** @minimum 1 */
   maxHp: number;
   currentHp: number;
-  armorClass: number;
+  /** Flat DT bonus from armor/shields */
+  dtBonus?: number;
   speed: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  power?: number;
+  power: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  vitality?: number;
+  vitality: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  spirit?: number;
+  spirit: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  agility?: number;
+  agility: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  endurance?: number;
+  endurance: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  precision?: number;
+  precision: number;
   /**
      * @minimum 1
      * @maximum 30
      */
-  willpower?: number;
+  willpower: number;
   /**
      * @minimum 1
      * @maximum 30

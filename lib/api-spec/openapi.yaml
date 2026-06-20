@@ -123,6 +123,33 @@ paths:
         "404":
           description: Not found
 
+  /characters/{id}/apply-damage:
+    post:
+      operationId: applyDamage
+      tags: [characters]
+      summary: Apply incoming damage using DT rules
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DamageInput"
+      responses:
+        "200":
+          description: Damage applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DamageResult"
+        "404":
+          description: Not found
+
   /characters/{id}/rolls:
     get:
       operationId: listCharacterRolls
@@ -295,13 +322,16 @@ components:
         - level
         - maxHp
         - currentHp
-        - armorClass
+        - dtBonus
+        - currentDt
         - speed
-        - strength
-        - dexterity
-        - constitution
-        - intelligence
-        - wisdom
+        - power
+        - vitality
+        - spirit
+        - agility
+        - endurance
+        - precision
+        - willpower
         - charisma
         - createdAt
         - updatedAt
@@ -320,8 +350,12 @@ components:
           type: integer
         currentHp:
           type: integer
-        armorClass:
+        dtBonus:
           type: integer
+          description: Flat DT bonus from armor/shields
+        currentDt:
+          type: integer
+          description: Current Damage Threshold (degrades in combat)
         speed:
           type: integer
         power:
@@ -360,13 +394,14 @@ components:
         - level
         - maxHp
         - currentHp
-        - armorClass
         - speed
-        - strength
-        - dexterity
-        - constitution
-        - intelligence
-        - wisdom
+        - power
+        - vitality
+        - spirit
+        - agility
+        - endurance
+        - precision
+        - willpower
         - charisma
       properties:
         name:
@@ -386,8 +421,9 @@ components:
           minimum: 1
         currentHp:
           type: integer
-        armorClass:
+        dtBonus:
           type: integer
+          description: Flat DT bonus from armor/shields
         speed:
           type: integer
         power:
@@ -445,8 +481,12 @@ components:
           minimum: 1
         currentHp:
           type: integer
-        armorClass:
+        dtBonus:
           type: integer
+          description: Flat DT bonus from armor/shields
+        currentDt:
+          type: integer
+          description: Current Damage Threshold
         speed:
           type: integer
         power:
@@ -485,6 +525,37 @@ components:
           type: string
         backstory:
           type: string
+
+    DamageInput:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: integer
+          minimum: 0
+          description: Incoming damage amount
+
+    DamageResult:
+      type: object
+      required:
+        - dtDropped
+        - hpLost
+        - newDt
+        - newHp
+        - absorbed
+      properties:
+        dtDropped:
+          type: boolean
+        hpLost:
+          type: integer
+        newDt:
+          type: integer
+        newHp:
+          type: integer
+        absorbed:
+          type: boolean
+          description: True if DT fully absorbed the damage (no HP lost)
 
     Roll:
       type: object

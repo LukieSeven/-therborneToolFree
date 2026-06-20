@@ -7,14 +7,15 @@ import {
   useDeleteCharacter,
   useCreateRoll,
   useListCharacterRolls,
-  getListCharacterRollsQueryKey
+  getListCharacterRollsQueryKey,
+  useApplyDamage,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Shield, Zap, ArrowLeft, Loader2, Trash2, Heart, Plus, Minus, Dice5 } from "lucide-react";
+import { Shield, Zap, ArrowLeft, Loader2, Trash2, Heart, Plus, Minus, Dice5, RotateCcw, Swords } from "lucide-react";
 import { format } from "date-fns";
 
 // Row 1: physical / Row 2: arcane/mental
@@ -72,6 +73,55 @@ export default function CharacterSheet() {
   useEffect(() => {
     if (character && hp === null) setHp(character.currentHp);
   }, [character, hp]);
+
+  const applyDamageMut = useApplyDamage();
+  const [currentDt, setCurrentDt] = useState<number | null>(null);
+  const [dtFlash, setDtFlash] = useState<"hit" | "restore" | null>(null);
+  const [damageInput, setDamageInput] = useState("");
+  const [damageResult, setDamageResult] = useState<{ hpLost: number; dtDropped: boolean; absorbed: boolean } | null>(null);
+
+  useEffect(() => {
+    if (character && currentDt === null) setCurrentDt(character.currentDt);
+  }, [character, currentDt]);
+
+  const maxDt = character ? character.endurance * 2 + character.dtBonus : 0;
+
+  const handleDtClick = () => {
+    if (currentDt === null || currentDt <= 0) return;
+    const newDt = currentDt - 1;
+    setCurrentDt(newDt);
+    setDtFlash("hit");
+    setTimeout(() => setDtFlash(null), 600);
+    updateChar.mutate({ id, data: { currentDt: newDt } }, {
+      onSuccess: (data) => queryClient.setQueryData(getGetCharacterQueryKey(id), data)
+    });
+  };
+
+  const handleRestoreDt = () => {
+    setCurrentDt(maxDt);
+    setDtFlash("restore");
+    setDamageResult(null);
+    setTimeout(() => setDtFlash(null), 600);
+    updateChar.mutate({ id, data: { currentDt: maxDt } }, {
+      onSuccess: (data) => queryClient.setQueryData(getGetCharacterQueryKey(id), data)
+    });
+  };
+
+  const handleApplyDamage = () => {
+    const amount = parseInt(damageInput);
+    if (isNaN(amount) || amount <= 0) return;
+    applyDamageMut.mutate({ id, data: { amount } }, {
+      onSuccess: (data) => {
+        setCurrentDt(data.newDt);
+        setHp(data.newHp);
+        setDamageResult({ hpLost: data.hpLost, dtDropped: data.dtDropped, absorbed: data.absorbed });
+        setDtFlash("hit");
+        setTimeout(() => setDtFlash(null), 600);
+        setDamageInput("");
+        queryClient.invalidateQueries({ queryKey: getGetCharacterQueryKey(id) });
+      }
+    });
+  };
 
   const [rollMod, setRollMod] = useState("0");
   const [rollLabel, setRollLabel] = useState("");
@@ -179,18 +229,94 @@ export default function CharacterSheet() {
                 <p className="text-xl text-muted-foreground uppercase tracking-widest font-serif">
                   Level {character.level} {character.race} {character.className}
                 </p>
-                <div className="mt-6 flex gap-6">
-                  <div className="flex flex-col items-center p-4 bg-background border border-border/50 rounded-lg min-w-[100px]">
-                    <Shield className="w-6 h-6 text-primary mb-2" />
-                    <span className="text-3xl font-mono font-bold text-foreground">{character.armorClass}</span>
-                    <span className="text-xs text-muted-foreground uppercase">Armor Class</span>
-                  </div>
+                <div className="mt-6 flex gap-4 flex-wrap">
+                  {/* DT panel — clickable to degrade */}
+                  <button
+                    onClick={handleDtClick}
+                    disabled={currentDt === 0}
+                    title="Click to drop DT by 1"
+                    className={`
+                      relative flex flex-col items-center p-4 rounded-lg min-w-[110px] border transition-all duration-200 group select-none
+                      ${dtFlash === "hit"
+                        ? "bg-destructive/20 border-destructive scale-95"
+                        : dtFlash === "restore"
+                          ? "bg-primary/20 border-primary scale-105"
+                          : "bg-background border-border/50 hover:border-destructive/50 hover:bg-destructive/5 hover:scale-95 cursor-pointer"
+                      }
+                      ${currentDt === 0 ? "opacity-50 cursor-not-allowed" : ""}
+                    `}
+                  >
+                    <Shield className={`w-6 h-6 mb-1 transition-colors ${dtFlash === "hit" ? "text-destructive" : "text-primary group-hover:text-destructive"}`} />
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-3xl font-mono font-bold transition-colors ${dtFlash === "hit" ? "text-destructive" : "text-foreground"}`}>
+                        {currentDt ?? character.currentDt}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-mono">/{maxDt}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">DT</span>
+                    {/* DT bar */}
+                    <div className="w-full bg-accent h-1 rounded-full mt-2 overflow-hidden">
+                      <div
+                        className="bg-primary h-full transition-all duration-300"
+                        style={{ width: `${maxDt > 0 ? Math.max(0, ((currentDt ?? character.currentDt) / maxDt) * 100) : 0}%` }}
+                      />
+                    </div>
+                  </button>
+
                   <div className="flex flex-col items-center p-4 bg-background border border-border/50 rounded-lg min-w-[100px]">
                     <Zap className="w-6 h-6 text-primary mb-2" />
                     <span className="text-3xl font-mono font-bold text-foreground">{character.speed}</span>
                     <span className="text-xs text-muted-foreground uppercase">Speed</span>
                   </div>
                 </div>
+
+                {/* Damage & DT controls */}
+                <div className="mt-4 flex flex-wrap gap-2 items-end">
+                  <div className="flex gap-1">
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">
+                        <Swords className="w-3 h-3 inline mr-1" />Incoming Damage
+                      </Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={damageInput}
+                        onChange={e => { setDamageInput(e.target.value); setDamageResult(null); }}
+                        onKeyDown={e => e.key === "Enter" && handleApplyDamage()}
+                        placeholder="0"
+                        className="w-20 h-8 text-center font-mono bg-background/50 border-border/50 text-sm"
+                      />
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="self-end h-8 px-3 text-xs"
+                      onClick={handleApplyDamage}
+                      disabled={!damageInput || applyDamageMut.isPending}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="self-end h-8 px-3 text-xs border-primary/30 text-primary hover:bg-primary/10"
+                    onClick={handleRestoreDt}
+                    title="Restore DT to max"
+                  >
+                    <RotateCcw className="w-3 h-3 mr-1" /> Restore DT
+                  </Button>
+                </div>
+
+                {/* Damage result feedback */}
+                {damageResult && (
+                  <div className={`mt-2 p-2 rounded text-xs font-mono animate-in fade-in ${damageResult.absorbed ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                    {damageResult.absorbed
+                      ? "DT held — damage fully absorbed."
+                      : `DT dropped · ${damageResult.hpLost > 0 ? `${damageResult.hpLost} overflow → HP` : "no HP lost"}`
+                    }
+                  </div>
+                )}
               </div>
 
               <div className="bg-background border border-primary/30 p-6 rounded-lg shadow-inner min-w-[200px] text-center">
