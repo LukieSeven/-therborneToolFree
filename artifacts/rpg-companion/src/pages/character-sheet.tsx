@@ -166,7 +166,7 @@ export default function CharacterSheet() {
                 <span className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-widest">{stat.label}</span>
                 <span className="block text-3xl font-serif text-foreground">{(character as any)[stat.key]}</span>
                 <div className="mt-2 text-sm font-mono text-primary bg-primary/10 rounded-full px-2 py-0.5 inline-block">
-                  {Math.floor(((character as any)[stat.key] - 10) / 2) >= 0 ? "+" : ""}{Math.floor(((character as any)[stat.key] - 10) / 2)}
+                  +{Math.floor((character as any)[stat.key] / 3)}
                 </div>
               </div>
             ))}
