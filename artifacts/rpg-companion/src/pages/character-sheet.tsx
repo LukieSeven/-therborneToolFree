@@ -133,9 +133,9 @@ export default function CharacterSheet() {
         onSuccess: (data) => {
           setTimeout(() => {
             setLastRoll({
-              rawRoll: data.result,
+              rawRoll: data.result ?? 0,
               modifier,
-              total: data.total,
+              total: data.total ?? 0,
               isCrit: (data as any).isCrit ?? false,
               diceType,
               label: label || rollLabel || diceType,
