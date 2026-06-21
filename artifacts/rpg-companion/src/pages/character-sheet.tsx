@@ -126,12 +126,34 @@ export default function CharacterSheet() {
   const [rollMod, setRollMod] = useState("0");
   const [rollLabel, setRollLabel] = useState("");
   const [rollingDice, setRollingDice] = useState<string | null>(null);
+
+  // WoW loot quality color progression (1st crit → 7th crit)
+  const CRIT_TIERS = [
+    { name: "Common",    color: "#e8e8e8" },
+    { name: "Uncommon",  color: "#1eff00" },
+    { name: "Rare",      color: "#0070ff" },
+    { name: "Epic",      color: "#a335ee" },
+    { name: "Legendary", color: "#ffd700" },
+    { name: "Artifact",  color: "#ff8000" },
+    { name: "Heirloom",  color: "#ff3030" },
+  ];
+
+  // Active crit chain state (null = no active chain)
+  const [critChain, setCritChain] = useState<{
+    chainCount: number;      // 0-indexed: 0 = 1st crit (white glow)
+    chainDie: string;        // die to roll for bonus (e.g. "d12")
+    runningDiceTotal: number;// sum of all dice rolled so far
+    modifier: number;        // applied once at the end
+    label: string;
+    lastRolledValue: number; // what was just rolled
+  } | null>(null);
+
   const [lastRoll, setLastRoll] = useState<{
     rawRoll: number;
     modifier: number;
     total: number;
-    isCrit: boolean;
-    critBonus: number;
+    hadCrit: boolean;        // was there any crit in the chain?
+    maxChainCount: number;   // highest chain count reached
     diceType: string;
     label: string;
   } | null>(null);
@@ -170,12 +192,13 @@ export default function CharacterSheet() {
     const modifier = autoModifier !== undefined ? autoModifier : (parseInt(rollMod) || 0);
     setRollingDice(rollKey);
     setLastRoll(null);
+    setCritChain(null);
     createRoll.mutate(
       {
         id,
         data: {
           diceType,
-          modifier,
+          modifier: 0, // modifier only applied at the very end of any chain
           label: label || (rollLabel || undefined),
           ...(statValue !== undefined ? { statValue } : {}),
         }
@@ -183,19 +206,82 @@ export default function CharacterSheet() {
       {
         onSuccess: (data) => {
           setTimeout(() => {
-            setLastRoll({
-              rawRoll: data.result ?? 0,
-              modifier,
-              total: data.total ?? 0,
-              isCrit: (data as any).isCrit ?? false,
-              critBonus: (data as any).critBonus ?? 0,
-              diceType,
-              label: label || rollLabel || diceType,
-            });
+            const rolled = data.result ?? 0;
+            const wasCrit = (data as any).isCrit ?? false;
+            // The chain die is the last (or only) die in the combo
+            const chainDie = diceType.split("+").pop() ?? diceType;
+            const rollLabel_ = label || rollLabel || diceType;
+
+            if (wasCrit) {
+              setCritChain({
+                chainCount: 0,
+                chainDie,
+                runningDiceTotal: rolled,
+                modifier,
+                label: rollLabel_,
+                lastRolledValue: rolled,
+              });
+              setLastRoll(null);
+            } else {
+              setLastRoll({
+                rawRoll: rolled,
+                modifier,
+                total: rolled + modifier,
+                hadCrit: false,
+                maxChainCount: -1,
+                diceType,
+                label: rollLabel_,
+              });
+            }
             setRollingDice(null);
             queryClient.invalidateQueries({ queryKey: getListCharacterRollsQueryKey(id) });
             queryClient.invalidateQueries({ queryKey: ["/api/rolls/recent"] });
-          }, 800);
+          }, 600);
+        },
+        onError: () => setRollingDice(null)
+      }
+    );
+  };
+
+  const handleChainRoll = () => {
+    if (!critChain) return;
+    const { chainDie, runningDiceTotal, modifier, label, chainCount } = critChain;
+    setRollingDice("chain");
+    createRoll.mutate(
+      { id, data: { diceType: chainDie, modifier: 0, label } },
+      {
+        onSuccess: (data) => {
+          setTimeout(() => {
+            const rolled = data.result ?? 0;
+            const wasCrit = (data as any).isCrit ?? false;
+            const newTotal = runningDiceTotal + rolled;
+
+            if (wasCrit) {
+              setCritChain({
+                chainCount: chainCount + 1,
+                chainDie,
+                runningDiceTotal: newTotal,
+                modifier,
+                label,
+                lastRolledValue: rolled,
+              });
+            } else {
+              // Chain ends — finalize with modifier
+              setCritChain(null);
+              setLastRoll({
+                rawRoll: newTotal,
+                modifier,
+                total: newTotal + modifier,
+                hadCrit: true,
+                maxChainCount: chainCount,
+                diceType: chainDie,
+                label,
+              });
+            }
+            setRollingDice(null);
+            queryClient.invalidateQueries({ queryKey: getListCharacterRollsQueryKey(id) });
+            queryClient.invalidateQueries({ queryKey: ["/api/rolls/recent"] });
+          }, 600);
         },
         onError: () => setRollingDice(null)
       }
@@ -455,70 +541,113 @@ export default function CharacterSheet() {
               </div>
 
               {/* Result display */}
-              <div className={`mt-2 p-6 border-2 border-dashed rounded-lg text-center relative min-h-[150px] flex flex-col items-center justify-center transition-colors duration-300 ${lastRoll?.isCrit ? "border-yellow-500/40 bg-yellow-500/5" : "border-border/50"}`}>
-                {rollingDice ? (
-                  <Dice5 className="w-12 h-12 animate-spin text-primary opacity-50" />
-                ) : lastRoll ? (
-                  <div className="animate-in zoom-in duration-300 w-full">
-                    {/* Label / crit banner */}
-                    {lastRoll.isCrit ? (
-                      <p className="text-xs font-bold tracking-[0.25em] uppercase text-yellow-500 mb-3 animate-in fade-in">
-                        ✦ Critical Hit! ✦
-                      </p>
-                    ) : (
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3 font-semibold">
-                        {lastRoll.label}
-                      </p>
-                    )}
+              {(() => {
+                const tier = critChain ? CRIT_TIERS[Math.min(critChain.chainCount, CRIT_TIERS.length - 1)] : null;
+                const finalTier = lastRoll?.hadCrit ? CRIT_TIERS[Math.min(lastRoll.maxChainCount, CRIT_TIERS.length - 1)] : null;
+                return (
+                  <div
+                    className="mt-2 p-6 border-2 rounded-lg text-center relative min-h-[160px] flex flex-col items-center justify-center transition-all duration-500"
+                    style={
+                      tier
+                        ? { borderColor: tier.color + "99", boxShadow: `0 0 24px 6px ${tier.color}55`, background: tier.color + "08" }
+                        : finalTier
+                          ? { borderColor: finalTier.color + "55", background: finalTier.color + "05" }
+                          : { borderColor: "rgba(255,255,255,0.1)" }
+                    }
+                  >
+                    {rollingDice ? (
+                      <Dice5 className="w-12 h-12 animate-spin text-primary opacity-50" />
+                    ) : critChain ? (
+                      /* ── Active crit chain ── */
+                      <div className="animate-in zoom-in duration-200 w-full">
+                        {/* Tier label */}
+                        <p className="text-[10px] uppercase tracking-[0.25em] mb-2 font-bold animate-pulse"
+                           style={{ color: tier!.color }}>
+                          ✦ {tier!.name} — Crit #{critChain.chainCount + 1} ✦
+                        </p>
 
-                    {/* Breakdown row */}
-                    <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
-                      {/* Base roll */}
-                      <div className="text-center">
-                        <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Roll</span>
-                        <span className="text-2xl font-mono font-semibold text-foreground">
-                          {lastRoll.isCrit ? lastRoll.rawRoll - lastRoll.critBonus : lastRoll.rawRoll}
-                        </span>
+                        {/* Last roll value */}
+                        <div className="mb-1">
+                          <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Rolled</span>
+                          <span className="text-4xl font-mono font-bold" style={{ color: tier!.color }}>
+                            {critChain.lastRolledValue}
+                          </span>
+                          <span className="text-[10px] uppercase tracking-wider block mt-0.5"
+                                style={{ color: tier!.color + "aa" }}>
+                            {critChain.chainDie} — Max!
+                          </span>
+                        </div>
+
+                        {/* Running total */}
+                        <div className="my-2 px-4 py-1 rounded-full inline-block text-xs font-mono text-muted-foreground border border-border/30">
+                          Running: {critChain.runningDiceTotal}
+                          {critChain.modifier !== 0 && <span className="text-primary"> +{critChain.modifier} mod</span>}
+                        </div>
+
+                        {/* One More! button */}
+                        <div className="mt-3">
+                          <button
+                            onClick={handleChainRoll}
+                            disabled={!!rollingDice}
+                            className="px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-widest animate-pulse disabled:opacity-50 transition-all hover:scale-105 hover:animate-none"
+                            style={{
+                              color: tier!.color,
+                              border: `2px solid ${tier!.color}`,
+                              boxShadow: `0 0 12px 2px ${tier!.color}44`,
+                              background: tier!.color + "15",
+                            }}
+                          >
+                            One More!
+                          </button>
+                        </div>
                       </div>
+                    ) : lastRoll ? (
+                      /* ── Final result ── */
+                      <div className="animate-in zoom-in duration-300 w-full">
+                        {lastRoll.hadCrit ? (
+                          <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3 animate-in fade-in"
+                             style={{ color: finalTier?.color ?? "#ffd700" }}>
+                            ✦ {finalTier?.name ?? "Critical"} Hit! ✦
+                          </p>
+                        ) : (
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3 font-semibold">
+                            {lastRoll.label}
+                          </p>
+                        )}
 
-                      {/* Crit bonus */}
-                      {lastRoll.isCrit && lastRoll.critBonus > 0 && (
-                        <>
-                          <span className="text-xl text-yellow-500/70 font-light mt-3">+</span>
+                        <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
                           <div className="text-center">
-                            <span className="text-[10px] text-yellow-500/70 block uppercase tracking-wider">Crit</span>
-                            <span className="text-2xl font-mono font-semibold text-yellow-500">{lastRoll.critBonus}</span>
+                            <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Roll</span>
+                            <span className="text-2xl font-mono font-semibold text-foreground">{lastRoll.rawRoll}</span>
                           </div>
-                        </>
-                      )}
+                          {lastRoll.modifier !== 0 && (
+                            <>
+                              <span className="text-xl text-muted-foreground font-light mt-3">+</span>
+                              <div className="text-center">
+                                <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Mod</span>
+                                <span className="text-2xl font-mono font-semibold text-primary">{lastRoll.modifier}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
 
-                      {/* Stat modifier */}
-                      {lastRoll.modifier !== 0 && (
-                        <>
-                          <span className="text-xl text-muted-foreground font-light mt-3">+</span>
-                          <div className="text-center">
-                            <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Mod</span>
-                            <span className="text-2xl font-mono font-semibold text-primary">{lastRoll.modifier}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                        <div className="h-px w-28 mx-auto my-2"
+                             style={{ background: finalTier ? finalTier.color + "60" : "rgba(var(--primary),0.3)" }} />
 
-                    {/* Divider */}
-                    <div className={`h-px w-28 mx-auto my-2 ${lastRoll.isCrit ? "bg-yellow-500/40" : "bg-primary/30"}`} />
-
-                    {/* Total — dominant */}
-                    <div>
-                      <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground block">Total</span>
-                      <span className={`text-7xl font-serif font-bold leading-none ${lastRoll.isCrit ? "text-yellow-500" : "text-primary"}`}>
-                        {lastRoll.total}
-                      </span>
-                    </div>
+                        <div>
+                          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground block">Total</span>
+                          <span className="text-7xl font-serif font-bold leading-none"
+                                style={{ color: finalTier?.color ?? "hsl(var(--primary))" }}>
+                            {lastRoll.total}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm font-serif italic">The dice await your command.</span>
+                    )}
                   </div>
-                ) : (
-                  <span className="text-muted-foreground text-sm font-serif italic">The dice await your command.</span>
-                )}
-              </div>
+                );
+              })()}
             </CardContent>
           </Card>
 

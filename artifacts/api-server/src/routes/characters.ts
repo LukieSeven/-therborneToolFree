@@ -212,16 +212,10 @@ router.post("/characters/:id/rolls", async (req, res): Promise<void> => {
     return [20, ...getStatDiceSides(s - 20)];
   }
 
-  // Exploding die: rolling the max face is a crit — add another roll of the same die.
-  // That bonus roll can itself crit, chaining indefinitely.
-  function rollExploding(sides: number): { total: number; bonus: number; isCrit: boolean } {
+  // Single roll — crit fires when the max face is hit. Chaining is client-driven.
+  function rollOnce(sides: number): { result: number; isCrit: boolean } {
     const rolled = Math.floor(Math.random() * sides) + 1;
-    if (rolled === sides) {
-      const chain = rollExploding(sides);
-      // bonus = everything added on top of the first roll
-      return { total: rolled + chain.total, isCrit: true, bonus: chain.total };
-    }
-    return { total: rolled, bonus: 0, isCrit: false };
+    return { result: rolled, isCrit: rolled === sides };
   }
 
   let result: number;
@@ -231,25 +225,26 @@ router.post("/characters/:id/rolls", async (req, res): Promise<void> => {
   let diceTypeStr = parsed.data.diceType;
 
   if (statValue !== undefined) {
+    // Roll all dice for this stat (stacked for stat > 20), no auto-chaining
     const diceSides = getStatDiceSides(statValue);
     diceTypeStr = diceSides.map(d => `d${d}`).join("+");
     let rollTotal = 0;
-    let anyCrit = false;
-    let totalCritBonus = 0;
     for (const sides of diceSides) {
-      const r = rollExploding(sides);
-      rollTotal += r.total;
-      if (r.isCrit) { anyCrit = true; totalCritBonus += r.bonus; }
+      const r = rollOnce(sides);
+      rollTotal += r.result;
+      if (r.isCrit) isCrit = true;
     }
     result = rollTotal;
-    isCrit = anyCrit;
-    critBonus = anyCrit ? totalCritBonus : null;
+    critBonus = null;
     total = rollTotal + modifier;
   } else {
+    // Manual die roll — also detects crits so the client can chain
     const sides = parseInt(diceTypeStr.replace("d", ""), 10) || 20;
-    const rolled = Math.floor(Math.random() * sides) + 1;
-    result = rolled;
-    total = rolled + modifier;
+    const r = rollOnce(sides);
+    result = r.result;
+    isCrit = r.isCrit;
+    critBonus = null;
+    total = result + modifier;
   }
 
   const [roll] = await db
