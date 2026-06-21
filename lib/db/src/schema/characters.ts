@@ -21,6 +21,7 @@ export const charactersTable = pgTable("characters", {
   precision: integer("precision").notNull().default(10),
   willpower: integer("willpower").notNull().default(10),
   charisma: integer("charisma").notNull().default(10),
+  currentMana: integer("current_mana").notNull().default(0),
   background: text("background"),
   backstory: text("backstory"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -333,6 +333,7 @@ components:
         - precision
         - willpower
         - charisma
+        - currentMana
         - createdAt
         - updatedAt
       properties:
@@ -356,6 +357,9 @@ components:
         currentDt:
           type: integer
           description: Current Damage Threshold (degrades in combat)
+        currentMana:
+          type: integer
+          description: Current mana points
         speed:
           type: integer
         power:
@@ -481,6 +485,9 @@ components:
           minimum: 1
         currentHp:
           type: integer
+        currentMana:
+          type: integer
+          description: Current mana points
         dtBonus:
           type: integer
           description: Flat DT bonus from armor/shields

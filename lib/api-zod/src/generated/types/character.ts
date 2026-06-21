@@ -18,6 +18,8 @@ export interface Character {
   dtBonus: number;
   /** Current Damage Threshold (degrades in combat) */
   currentDt: number;
+  /** Current mana points */
+  currentMana: number;
   speed: number;
   power: number;
   vitality: number;

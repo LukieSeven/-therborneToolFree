@@ -21,6 +21,8 @@ export interface Character {
   dtBonus: number;
   /** Current Damage Threshold (degrades in combat) */
   currentDt: number;
+  /** Current mana points */
+  currentMana: number;
   speed: number;
   power: number;
   vitality: number;
@@ -107,6 +109,8 @@ export interface CharacterUpdate {
   /** @minimum 1 */
   maxHp?: number;
   currentHp?: number;
+  /** Current mana points */
+  currentMana?: number;
   /** Flat DT bonus from armor/shields */
   dtBonus?: number;
   /** Current Damage Threshold */

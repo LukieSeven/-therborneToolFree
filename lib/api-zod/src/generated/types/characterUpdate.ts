@@ -16,6 +16,8 @@ export interface CharacterUpdate {
   /** @minimum 1 */
   maxHp?: number;
   currentHp?: number;
+  /** Current mana points */
+  currentMana?: number;
   /** Flat DT bonus from armor/shields */
   dtBonus?: number;
   /** Current Damage Threshold */
