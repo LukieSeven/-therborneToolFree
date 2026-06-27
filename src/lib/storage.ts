@@ -147,11 +147,43 @@ export function evaluateFormula(formula: string, variables: Record<string, numbe
   }
 }
 
+// ── Safe Storage Wrapper ───────────────────────────────────
+class MemoryStorage {
+  private data: Record<string, string> = {};
+  getItem(key: string): string | null {
+    return this.data[key] || null;
+  }
+  setItem(key: string, value: string): void {
+    this.data[key] = value;
+  }
+  removeItem(key: string): void {
+    delete this.data[key];
+  }
+  clear(): void {
+    this.data = {};
+  }
+}
+
+let safeStorage: {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+};
+
+try {
+  const testKey = "__test_localstorage_access__";
+  window.localStorage.setItem(testKey, testKey);
+  window.localStorage.removeItem(testKey);
+  safeStorage = window.localStorage;
+} catch (e) {
+  console.warn("localStorage is blocked or unavailable (often due to iframe sandbox security). Falling back to memory storage.", e);
+  safeStorage = new MemoryStorage();
+}
+
 // ── Raw Storage Getters/Setters ───────────────────────────
 
 function getList<T>(key: string): T[] {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = safeStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -159,7 +191,7 @@ function getList<T>(key: string): T[] {
 }
 
 function setList<T>(key: string, list: T[]): void {
-  localStorage.setItem(key, JSON.stringify(list));
+  safeStorage.setItem(key, JSON.stringify(list));
 }
 
 // Keys
@@ -692,7 +724,7 @@ export function importCharacterJSON(jsonString: string): Character {
 // ── Default Mock Database Initialization ──────────────────
 
 function initializeDefaultSample(): void {
-  const initialized = localStorage.getItem("aetherborne_initialized");
+  const initialized = safeStorage.getItem("aetherborne_initialized");
   if (initialized === "true") return;
 
   // Insert Garrick
@@ -839,5 +871,5 @@ function initializeDefaultSample(): void {
   ];
   setList(KEYS.notes, notes);
 
-  localStorage.setItem("aetherborne_initialized", "true");
+  safeStorage.setItem("aetherborne_initialized", "true");
 }
