@@ -1,5 +1,48 @@
 // AEtherborne Standalone Browser Storage Engine
 
+export interface FavoriteSlot {
+  type: "weapon" | "ability" | "skill" | "familiar-ability" | "attribute" | "familiar-attribute";
+  targetId: string | number;
+  label: string;
+}
+
+export interface FamiliarAbility {
+  id: number;
+  name: string;
+  description: string;
+  cost: number;
+  cooldown: number;
+  range: string;
+  speed: string;
+  rollFormula: string;
+  linkedStat: string;
+  assignedToQuickRolls: boolean;
+}
+
+export interface Familiar {
+  name: string;
+  className: string;
+  race: string;
+  level: number;
+  speed: number;
+  power: number;
+  vitality: number;
+  spirit: number;
+  agility: number;
+  endurance: number;
+  precision: number;
+  willpower: number;
+  charisma: number;
+  currentHp: number;
+  currentMana: number;
+  currentDt: number;
+  dtBonus: number;
+  hpFormula: string;
+  manaFormula: string;
+  dtFormula: string;
+  abilities: FamiliarAbility[];
+}
+
 export interface Character {
   id: number;
   name: string;
@@ -34,6 +77,8 @@ export interface Character {
   precisionTraining: number;
   willpowerTraining: number;
   charismaTraining: number;
+  favorites?: (FavoriteSlot | null)[];
+  familiar?: Familiar | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -813,7 +858,7 @@ function initializeDefaultSample(): void {
     { id: 1, characterId: 1, name: "Aegis", description: "Shielding energies of ancient steel.", slot: 1 },
     { id: 2, characterId: 1, name: "Earthguard", description: "Defensive solid earth attunement.", slot: 2 },
     { id: 3, characterId: 1, name: "Stoneform", description: "Hardening skin like heavy bedrock.", slot: 3 },
-    { id: 4, characterId: 1, name: "Merged: Bastion of Gaia", description: "Ultimate earth defense alignment.", slot: 4 },
+    { id: 4, characterId: 1, name: "Confluence: Bastion of Gaia", description: "Ultimate earth defense alignment.", slot: 4 },
   ];
   setList(KEYS.essences, essences);
 

@@ -5,9 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
-import Characters from "@/pages/characters";
 import CharacterSheet from "@/pages/character-sheet";
-import Notes from "@/pages/notes";
 
 const queryClient = new QueryClient();
 
@@ -16,9 +14,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
-        <Route path="/characters" component={Characters} />
         <Route path="/characters/:id" component={CharacterSheet} />
-        <Route path="/notes" component={Notes} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
