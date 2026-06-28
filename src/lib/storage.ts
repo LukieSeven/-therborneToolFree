@@ -750,6 +750,129 @@ export const storage = {
 
 // ── JSON Import / Export Functions ─────────────────────────
 
+const DEFAULT_CHARACTER: Omit<Character, "id" | "name"> = {
+  rank: "Iron",
+  race: "Human",
+  level: 1,
+  maxHp: 20,
+  currentHp: 20,
+  dtBonus: 0,
+  currentDt: 0,
+  speed: 30,
+  power: 10,
+  vitality: 10,
+  spirit: 10,
+  agility: 10,
+  endurance: 10,
+  precision: 10,
+  willpower: 10,
+  charisma: 10,
+  currentMana: 10,
+  background: null,
+  backstory: null,
+  hpFormula: "Vitality * 8",
+  manaFormula: "Spirit * 5",
+  dtFormula: "Endurance * 1",
+  powerTraining: 0,
+  vitalityTraining: 0,
+  spiritTraining: 0,
+  agilityTraining: 0,
+  enduranceTraining: 0,
+  precisionTraining: 0,
+  willpowerTraining: 0,
+  charismaTraining: 0,
+  favorites: Array(10).fill(null),
+  familiars: [],
+  resistances: "",
+  immunities: "",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
+};
+
+const DEFAULT_FAMILIAR: Omit<Familiar, "id" | "name"> = {
+  className: "Companion",
+  race: "Beast",
+  level: 1,
+  speed: 25,
+  power: 10,
+  vitality: 10,
+  spirit: 10,
+  agility: 10,
+  endurance: 10,
+  precision: 10,
+  willpower: 10,
+  charisma: 10,
+  currentHp: 10,
+  currentMana: 10,
+  currentDt: 0,
+  dtBonus: 0,
+  hpFormula: "Vitality * 8",
+  manaFormula: "Spirit * 5",
+  dtFormula: "Endurance * 1",
+  abilities: [],
+  resistances: "",
+  immunities: ""
+};
+
+const DEFAULT_EQUIPMENT: Omit<Equipment, "id" | "characterId" | "name"> = {
+  description: "",
+  equipped: false,
+  assignedToQuickRolls: false,
+  dtBonus: 0,
+  statModifiers: {},
+  diceType: "d8",
+  modifier: 0
+};
+
+const DEFAULT_CURRENCY: Omit<Currency, "id" | "characterId" | "name"> = {
+  amount: 0
+};
+
+const DEFAULT_INVENTORY_ITEM: Omit<InventoryItem, "id" | "characterId" | "name"> = {
+  description: "",
+  quantity: 1
+};
+
+const DEFAULT_ESSENCE: Omit<Essence, "id" | "characterId" | "name"> = {
+  description: "",
+  slot: 1
+};
+
+const DEFAULT_ABILITY: Omit<Ability, "id" | "characterId" | "name"> = {
+  description: "",
+  cost: 0,
+  cooldown: 0,
+  range: "Self",
+  speed: "Instant",
+  rollFormula: "",
+  linkedStat: "spirit",
+  assignedToQuickRolls: false,
+  level: 1,
+  bonusPower: 0,
+  bonusVitality: 0,
+  bonusSpirit: 0,
+  bonusAgility: 0,
+  bonusEndurance: 0,
+  bonusPrecision: 0,
+  bonusWillpower: 0,
+  bonusCharisma: 0,
+  bonusHp: 0,
+  bonusMana: 0,
+  bonusDt: 0
+};
+
+const DEFAULT_SKILL: Omit<Skill, "id" | "characterId" | "name"> = {
+  value: 3,
+  training: 0
+};
+
+const DEFAULT_NOTE: Omit<Note, "id" | "characterId" | "createdAt" | "updatedAt"> = {
+  title: "Untitled Note",
+  content: "",
+  category: "general",
+  tags: []
+};
+
 export function exportCharacterJSON(charId: number): void {
   const char = storage.getCharacter(charId);
   if (!char) return;
@@ -762,7 +885,7 @@ export function exportCharacterJSON(charId: number): void {
     essences: storage.getEssences(charId),
     abilities: storage.getAbilities(charId),
     skills: storage.getSkills(charId),
-    notes: storage.getNotes(charId),
+    notes: storage.getNotes(charId)
   };
 
   const filename = `${char.name.toLowerCase().replace(/\s+/g, "_")}_sheet.json`;
@@ -786,22 +909,57 @@ export function importCharacterJSON(jsonString: string): Character {
   const chars = storage.getCharacters();
   const nextCharId = chars.length > 0 ? Math.max(...chars.map(c => c.id)) + 1 : 1;
 
+  // Merge legacy or missing character properties with DEFAULT_CHARACTER
+  const mergedCharacter = {
+    ...DEFAULT_CHARACTER,
+    ...data.character
+  };
+
+  // Merge familiars if array exists
+  if (Array.isArray(mergedCharacter.familiars)) {
+    mergedCharacter.familiars = mergedCharacter.familiars.map((fam: any) => ({
+      ...DEFAULT_FAMILIAR,
+      ...fam,
+      id: fam.id || Date.now() + Math.random(),
+      name: fam.name || "Companion",
+      abilities: Array.isArray(fam.abilities)
+        ? fam.abilities.map((ab: any) => ({
+            id: ab.id || Date.now() + Math.random(),
+            name: ab.name || "Ability",
+            description: ab.description || "",
+            cost: ab.cost || 0,
+            cooldown: ab.cooldown || 0,
+            range: ab.range || "Melee",
+            speed: ab.speed || "Standard",
+            rollFormula: ab.rollFormula || "",
+            linkedStat: ab.linkedStat || "power",
+            assignedToQuickRolls: !!ab.assignedToQuickRolls
+          }))
+        : []
+    }));
+  }
+
   // Insert character with new ID
   const importedChar: Character = {
-    ...data.character,
+    ...mergedCharacter,
     id: nextCharId,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   chars.push(importedChar);
   setList(KEYS.characters, chars);
 
-  // Helper to remap IDs for nested lists
+  // Helper to remap IDs for nested lists defensively merging with default schemas
   if (Array.isArray(data.equipment)) {
     const list = getList<Equipment>(KEYS.equipment);
     let nextId = list.length > 0 ? Math.max(...list.map(e => e.id)) + 1 : 1;
     data.equipment.forEach((item: any) => {
-      list.push({ ...item, id: nextId++, characterId: nextCharId });
+      list.push({
+        ...DEFAULT_EQUIPMENT,
+        ...item,
+        id: nextId++,
+        characterId: nextCharId
+      });
     });
     setList(KEYS.equipment, list);
   }
@@ -810,7 +968,12 @@ export function importCharacterJSON(jsonString: string): Character {
     const list = getList<Currency>(KEYS.currencies);
     let nextId = list.length > 0 ? Math.max(...list.map(c => c.id)) + 1 : 1;
     data.currencies.forEach((item: any) => {
-      list.push({ ...item, id: nextId++, characterId: nextCharId });
+      list.push({
+        ...DEFAULT_CURRENCY,
+        ...item,
+        id: nextId++,
+        characterId: nextCharId
+      });
     });
     setList(KEYS.currencies, list);
   }
@@ -819,7 +982,12 @@ export function importCharacterJSON(jsonString: string): Character {
     const list = getList<InventoryItem>(KEYS.inventory);
     let nextId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
     data.inventory.forEach((item: any) => {
-      list.push({ ...item, id: nextId++, characterId: nextCharId });
+      list.push({
+        ...DEFAULT_INVENTORY_ITEM,
+        ...item,
+        id: nextId++,
+        characterId: nextCharId
+      });
     });
     setList(KEYS.inventory, list);
   }
@@ -828,7 +996,12 @@ export function importCharacterJSON(jsonString: string): Character {
     const list = getList<Essence>(KEYS.essences);
     let nextId = list.length > 0 ? Math.max(...list.map(e => e.id)) + 1 : 1;
     data.essences.forEach((item: any) => {
-      list.push({ ...item, id: nextId++, characterId: nextCharId });
+      list.push({
+        ...DEFAULT_ESSENCE,
+        ...item,
+        id: nextId++,
+        characterId: nextCharId
+      });
     });
     setList(KEYS.essences, list);
   }
@@ -837,7 +1010,12 @@ export function importCharacterJSON(jsonString: string): Character {
     const list = getList<Ability>(KEYS.abilities);
     let nextId = list.length > 0 ? Math.max(...list.map(a => a.id)) + 1 : 1;
     data.abilities.forEach((item: any) => {
-      list.push({ ...item, id: nextId++, characterId: nextCharId });
+      list.push({
+        ...DEFAULT_ABILITY,
+        ...item,
+        id: nextId++,
+        characterId: nextCharId
+      });
     });
     setList(KEYS.abilities, list);
   }
@@ -846,7 +1024,12 @@ export function importCharacterJSON(jsonString: string): Character {
     const list = getList<Skill>(KEYS.skills);
     let nextId = list.length > 0 ? Math.max(...list.map(s => s.id)) + 1 : 1;
     data.skills.forEach((item: any) => {
-      list.push({ ...item, id: nextId++, characterId: nextCharId });
+      list.push({
+        ...DEFAULT_SKILL,
+        ...item,
+        id: nextId++,
+        characterId: nextCharId
+      });
     });
     setList(KEYS.skills, list);
   }
@@ -856,11 +1039,12 @@ export function importCharacterJSON(jsonString: string): Character {
     let nextId = list.length > 0 ? Math.max(...list.map(n => n.id)) + 1 : 1;
     data.notes.forEach((item: any) => {
       list.push({
+        ...DEFAULT_NOTE,
         ...item,
         id: nextId++,
         characterId: nextCharId,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
     });
     setList(KEYS.notes, list);
