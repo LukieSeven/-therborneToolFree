@@ -905,7 +905,7 @@ export default function CharacterSheet() {
             });
 
             if (wasCrit) {
-              const breakdownStr = modifier !== 0 ? (modifier > 0 ? `${rolled}!+${modifier}` : `${rolled}!-${Math.abs(modifier)}`) : `${rolled}!`;
+              const breakdownStr = `${rolled}!`;
               setCritChain({
                 chainCount: 0,
                 chainDie,
@@ -913,10 +913,19 @@ export default function CharacterSheet() {
                 modifier,
                 label: lbl,
                 lastRolledValue: rolled,
-                rolls: [{ label: "Roll 1", breakdown: breakdownStr, total: rolled + modifier }]
+                rolls: [{ label: "Roll 1", breakdown: breakdownStr, total: rolled }]
               });
             } else {
-              setLastRoll({ rawRoll: rolled, modifier, total: rolled + modifier, hadCrit: false, maxChainCount: -1, diceType: data.diceType, label: lbl });
+              setLastRoll({
+                rawRoll: rolled,
+                modifier,
+                total: rolled + modifier,
+                hadCrit: false,
+                maxChainCount: -1,
+                diceType: data.diceType,
+                label: lbl,
+                rolls: [{ label: "Roll 1", breakdown: String(rolled), total: rolled }]
+              });
             }
             setRollingDice(null);
           }, 600);
@@ -1150,9 +1159,9 @@ export default function CharacterSheet() {
             const rolled = data.result ?? 0;
             const wasCrit = (data as any).isCrit ?? false;
             if (wasCrit) {
-              setCritChain({ chainCount: 0, chainDie: dice, runningDiceTotal: rolled, modifier: mod, label: `Fam: ${statLabel} Roll`, lastRolledValue: rolled });
+              setCritChain({ chainCount: 0, chainDie: dice, runningDiceTotal: rolled, modifier: mod, label: `Fam: ${statLabel} Roll`, lastRolledValue: rolled, rolls: [{ label: "Roll 1", breakdown: `${rolled}!`, total: rolled }] });
             } else {
-              setLastRoll({ rawRoll: rolled, modifier: mod, total: rolled + mod, hadCrit: false, maxChainCount: -1, diceType: dice, label: `Fam: ${statLabel} Roll` });
+              setLastRoll({ rawRoll: rolled, modifier: mod, total: rolled + mod, hadCrit: false, maxChainCount: -1, diceType: dice, label: `Fam: ${statLabel} Roll`, rolls: [{ label: "Roll 1", breakdown: String(rolled), total: rolled }] });
             }
             setRollingDice(null);
           }, 600);
@@ -1193,9 +1202,9 @@ export default function CharacterSheet() {
               const wasCrit = (data as any).isCrit ?? false;
               const chainDie = ability.rollFormula.split("+").pop() ?? ability.rollFormula;
               if (wasCrit) {
-                setCritChain({ chainCount: 0, chainDie, runningDiceTotal: rolled, modifier: 0, label: `Fam: ${ability.name} Cast`, lastRolledValue: rolled });
+                setCritChain({ chainCount: 0, chainDie, runningDiceTotal: rolled, modifier: 0, label: `Fam: ${ability.name} Cast`, lastRolledValue: rolled, rolls: [{ label: "Roll 1", breakdown: `${rolled}!`, total: rolled }] });
               } else {
-                setLastRoll({ rawRoll: rolled, modifier: 0, total: rolled, hadCrit: false, maxChainCount: -1, diceType: data.diceType, label: `Fam: ${ability.name} Cast` });
+                setLastRoll({ rawRoll: rolled, modifier: 0, total: rolled, hadCrit: false, maxChainCount: -1, diceType: data.diceType, label: `Fam: ${ability.name} Cast`, rolls: [{ label: "Roll 1", breakdown: String(rolled), total: rolled }] });
               }
               setRollingDice(null);
             }, 600);
@@ -2292,7 +2301,7 @@ export default function CharacterSheet() {
                     ) : (
                       <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500/60 mb-2 font-semibold">{lastRoll.label}</p>
                     )}
-                    {lastRoll.hadCrit && lastRoll.rolls && lastRoll.rolls.length > 0 ? (
+                    {lastRoll.rolls && lastRoll.rolls.length > 0 ? (
                       <div className="space-y-2 my-2 text-center">
                         <div className="text-sm font-semibold text-emerald-300/80 font-mono tracking-wide">
                           {lastRoll.rolls.map(r => r.breakdown).join(" + ")}
