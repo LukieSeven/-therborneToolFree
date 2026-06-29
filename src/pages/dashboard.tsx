@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useListCharacters, useCreateCharacter, useListRecaps, useCreateRecap, useDeleteRecap } from "@/hooks/useStorage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
