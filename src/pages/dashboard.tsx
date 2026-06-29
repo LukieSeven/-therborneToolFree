@@ -405,8 +405,7 @@ export default function Dashboard() {
             </form>
           </DialogContent>
         </Dialog>
-        </div>
-      </header>
+      </div>
 
       {/* Two Column Layout: Roster (Left) & Recent Fate (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
