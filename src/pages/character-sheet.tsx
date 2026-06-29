@@ -933,7 +933,7 @@ export default function CharacterSheet() {
 
   const handleChainRoll = () => {
     if (!critChain) return;
-    const { chainDie, runningDiceTotal, modifier, label, chainCount } = critChain;
+    const { chainDie, runningDiceTotal, modifier, label, chainCount, rolls: prevRolls } = critChain;
     setRollingDice("chain");
     
     createRoll.mutate(
@@ -947,7 +947,7 @@ export default function CharacterSheet() {
             
             const breakdownStr = rolled + (wasCrit ? "!" : "");
             const rollTotal = rolled;
-            const newRolls = [...critChain.rolls, { label: `Roll ${chainCount + 2}`, breakdown: breakdownStr, total: rollTotal }];
+            const newRolls = [...prevRolls, { label: `Roll ${chainCount + 2}`, breakdown: breakdownStr, total: rollTotal }];
 
             if (wasCrit) {
               setCritChain({ chainCount: chainCount + 1, chainDie, runningDiceTotal: newTotal, modifier, label, lastRolledValue: rolled, rolls: newRolls });
