@@ -442,6 +442,7 @@ export default function CharacterSheet() {
     modifier: number;
     label: string;
     lastRolledValue: number;
+    rolls: string[];
   } | null>(null);
 
   const [lastRoll, setLastRoll] = useState<{
@@ -452,6 +453,7 @@ export default function CharacterSheet() {
     maxChainCount: number;
     diceType: string;
     label: string;
+    rolls?: string[];
   } | null>(null);
 
   if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -903,7 +905,7 @@ export default function CharacterSheet() {
             });
 
             if (wasCrit) {
-              setCritChain({ chainCount: 0, chainDie, runningDiceTotal: rolled, modifier, label: lbl, lastRolledValue: rolled });
+              setCritChain({ chainCount: 0, chainDie, runningDiceTotal: rolled, modifier, label: lbl, lastRolledValue: rolled, rolls: [`${rolled}!`] });
             } else {
               setLastRoll({ rawRoll: rolled, modifier, total: rolled + modifier, hadCrit: false, maxChainCount: -1, diceType: data.diceType, label: lbl });
             }
@@ -935,10 +937,10 @@ export default function CharacterSheet() {
             const newTotal = runningDiceTotal + rolled;
             
             if (wasCrit) {
-              setCritChain({ chainCount: chainCount + 1, chainDie, runningDiceTotal: newTotal, modifier, label, lastRolledValue: rolled });
+              setCritChain({ chainCount: chainCount + 1, chainDie, runningDiceTotal: newTotal, modifier, label, lastRolledValue: rolled, rolls: [...critChain.rolls, `${rolled}!`] });
             } else {
+              setLastRoll({ rawRoll: newTotal, modifier, total: newTotal + modifier, hadCrit: true, maxChainCount: chainCount, diceType: chainDie, label, rolls: [...critChain.rolls, String(rolled)] });
               setCritChain(null);
-              setLastRoll({ rawRoll: newTotal, modifier, total: newTotal + modifier, hadCrit: true, maxChainCount: chainCount, diceType: chainDie, label });
             }
             setRollingDice(null);
           }, 600);
@@ -2247,6 +2249,14 @@ export default function CharacterSheet() {
                         {critChain.chainDie} — Max!
                       </span>
                     </div>
+                    <div className="space-y-1 my-2 max-w-[80%] mx-auto border-t border-b border-emerald-950/20 py-1.5">
+                      {critChain.rolls.map((r, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs">
+                          <span className="text-emerald-500/50 uppercase text-[9px] tracking-wider">Roll {idx + 1}</span>
+                          <span className="font-bold text-emerald-300" style={{ color: r.includes("!") ? tier!.color : undefined }}>{r}</span>
+                        </div>
+                      ))}
+                    </div>
                     <div className="my-1 px-3 py-0.5 rounded border border-emerald-950 bg-emerald-950/20 inline-block text-xs text-emerald-500/75">
                       Running: {critChain.runningDiceTotal}
                       {critChain.modifier !== 0 && <span className="text-emerald-400"> +{critChain.modifier}</span>}
@@ -2276,7 +2286,16 @@ export default function CharacterSheet() {
                     ) : (
                       <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500/60 mb-2 font-semibold">{lastRoll.label}</p>
                     )}
-                    {lastRoll.diceType && (lastRoll.diceType.includes("(") || lastRoll.diceType.includes("+") || lastRoll.diceType.includes("-") || lastRoll.diceType.includes("*")) ? (
+                    {lastRoll.hadCrit && lastRoll.rolls && lastRoll.rolls.length > 0 ? (
+                      <div className="space-y-1 my-2 max-w-[80%] mx-auto border-t border-b border-emerald-950/20 py-1.5">
+                        {lastRoll.rolls.map((r, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-xs">
+                            <span className="text-emerald-500/50 uppercase text-[9px] tracking-wider">Roll {idx + 1}</span>
+                            <span className="font-bold text-emerald-300" style={{ color: r.includes("!") ? (finalTier?.color ?? "#ffd700") : undefined }}>{r}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : lastRoll.diceType && (lastRoll.diceType.includes("(") || lastRoll.diceType.includes("+") || lastRoll.diceType.includes("-") || lastRoll.diceType.includes("*")) ? (
                       <div className="text-sm font-semibold text-emerald-300/90 mb-3 font-mono bg-emerald-950/30 py-1.5 px-3 border border-emerald-500/10 rounded inline-block max-w-[90%] mx-auto leading-normal">
                         {lastRoll.diceType}
                       </div>

@@ -612,11 +612,14 @@ export function useCreateRoll() {
           let sum = 0;
           const rolls: number[] = [];
           let crit = false;
+          let remainingStat = statVal;
           for (const sides of diceSides) {
             const r = rollOnce(sides);
-            sum += r.result;
-            rolls.push(r.result);
+            const cappedResult = Math.min(r.result, remainingStat);
+            sum += cappedResult;
+            rolls.push(cappedResult);
             if (r.isCrit) crit = true;
+            remainingStat -= sides;
           }
           const desc = diceSides.map((sides, i) => `d${sides}(${rolls[i]})`).join("+");
           return { total: sum, desc, isCrit: crit };
