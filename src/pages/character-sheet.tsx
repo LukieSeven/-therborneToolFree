@@ -2361,6 +2361,7 @@ export default function CharacterSheet() {
             </DialogContent>
           </Dialog>
         </Card>
+      </div>
 
       {/* ── TABBED TOOL SCREEN BAR ── */}
       <div className="flex gap-1 border-b border-border/40 mt-6 overflow-x-auto pb-1 flex-wrap">
