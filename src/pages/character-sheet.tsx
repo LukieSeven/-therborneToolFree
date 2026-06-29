@@ -22,17 +22,20 @@ import {
   useCreateRoll, useListCharacterRolls,
   useListEquipment, useUpdateEquipment, useDeleteEquipment,
   useListCurrencies, useUpdateCurrency, useDeleteCurrency,
-  useListInventory, useDeleteInventoryItem,
+  useListInventory, useUpdateInventoryItem, useDeleteInventoryItem,
   useListEssences, useAddEssence, useDeleteEssence,
   useListAbilities, useUpdateAbility,
   useListSkills, useUpdateSkill,
-  useListNotes, useCreateNote, useDeleteNote,
+  useListNotes, useCreateNote, useUpdateNote, useDeleteNote,
   getGetCharacterQueryKey, getListCharacterRollsQueryKey, getListNotesQueryKey
 } from "@/hooks/useStorage";
 import { 
   getAdjustedStats, getDiceLabel, exportCharacterJSON, importCharacterJSON, 
   Ability, Equipment, Skill, FavoriteSlot, Familiar, FamiliarAbility, evaluateFormula 
 } from "@/lib/storage";
+
+import { RollGuideDialog } from "@/components/dialogs/roll-guide-dialog";
+import { EditFamiliarDialog } from "@/components/dialogs/edit-familiar-dialog";
 
 // Dialog Modals
 import { EditCharacterDialog } from "@/components/dialogs/edit-character-dialog";
@@ -93,19 +96,68 @@ function ResourceBar({ current, max, color }: { current: number; max: number; co
 
 // Favorites Migration/Getter Helper
 const getFavorites = (char: any, eq: any[], ab: any[]): (FavoriteSlot | null)[] => {
-  if (char && char.favorites && Array.isArray(char.favorites) && char.favorites.length === 10) {
-    return char.favorites;
+  if (char && char.favorites && Array.isArray(char.favorites)) {
+    if (char.favorites.length === 20) {
+      return char.favorites;
+    }
+    if (char.favorites.length === 10) {
+      return [...char.favorites, ...Array(10).fill(null)];
+    }
   }
-  const slots: (FavoriteSlot | null)[] = Array(10).fill(null);
+  const slots: (FavoriteSlot | null)[] = Array(20).fill(null);
   let idx = 0;
   eq.filter(e => e.equipped && e.assignedToQuickRolls).forEach(e => {
-    if (idx < 10) slots[idx++] = { type: "weapon", targetId: e.id, label: e.name };
+    if (idx < 20) slots[idx++] = { type: "weapon", targetId: e.id, label: e.name };
   });
   ab.filter(a => a.assignedToQuickRolls).forEach(a => {
-    if (idx < 10) slots[idx++] = { type: "ability", targetId: a.id, label: a.name };
+    if (idx < 20) slots[idx++] = { type: "ability", targetId: a.id, label: a.name };
   });
   return slots;
 };
+
+interface Combatant {
+  id: string;
+  name: string;
+  initiative: number;
+  statuses: string[];
+}
+
+function compressImage(file: File, maxW: number, maxH: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxW) {
+            height *= maxW / width;
+            width = maxW;
+          }
+        } else {
+          if (height > maxH) {
+            width *= maxH / height;
+            height = maxH;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+}
 
 export default function CharacterSheet() {
   const params = useParams();
@@ -135,9 +187,14 @@ export default function CharacterSheet() {
   const updateEq = useUpdateEquipment();
   const deleteEq = useDeleteEquipment();
 
+  // Inventory mutators
+  const updateInvItem = useUpdateInventoryItem();
+  const deleteInvItem = useDeleteInventoryItem();
+
   // Notes mutators
   const createNote = useCreateNote();
   const deleteNote = useDeleteNote();
+  const updateNote = useUpdateNote();
 
   // Essences mutators
   const addEssence = useAddEssence();
@@ -150,7 +207,7 @@ export default function CharacterSheet() {
   const updateAbilityMut = useUpdateAbility();
 
   // ── Tab State ─────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"stats" | "skills" | "inventory" | "essences" | "abilities" | "notes" | "familiar">("stats");
+  const [activeTab, setActiveTab] = useState<"stats" | "skills" | "inventory" | "essences" | "abilities" | "notes" | "familiar" | "combat">("stats");
 
   // ── Resource state ────────────────────────────────────────
   const [hp, setHp] = useState<number | null>(null);
@@ -174,16 +231,49 @@ export default function CharacterSheet() {
     }
   }, [character?.currentHp, character?.currentMana, character?.currentDt]);
 
+  // ── Combat Tracker LocalStorage Persistence ───────────────
+  useEffect(() => {
+    if (id) {
+      try {
+        const savedCombatants = localStorage.getItem(`aetherborne_combatants_${id}`);
+        if (savedCombatants) setCombatants(JSON.parse(savedCombatants));
+        const savedTurnIdx = localStorage.getItem(`aetherborne_combatants_turn_${id}`);
+        if (savedTurnIdx) setCurrentTurnIdx(Number(savedTurnIdx));
+        const savedRecents = localStorage.getItem(`aetherborne_combatants_recents_${id}`);
+        if (savedRecents) setRecentCombatants(JSON.parse(savedRecents));
+      } catch (e) {
+        console.error("Failed to load combat tracker state", e);
+      }
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      localStorage.setItem(`aetherborne_combatants_${id}`, JSON.stringify(combatants));
+      localStorage.setItem(`aetherborne_combatants_turn_${id}`, String(currentTurnIdx));
+      localStorage.setItem(`aetherborne_combatants_recents_${id}`, JSON.stringify(recentCombatants));
+    }
+  }, [id, combatants, currentTurnIdx, recentCombatants]);
+
+  // ── Familiar Release States ──────────────────────────────
+  const [releasingFamId, setReleasingFamId] = useState<number | string | null>(null);
+  const [isReleaseConfirmOpen, setIsReleaseConfirmOpen] = useState(false);
+  const [isReleaseDoubleConfirmOpen, setIsReleaseDoubleConfirmOpen] = useState(false);
+
   // ── Long Rest State & Action ───────────────────────────────
   const [isLongRestConfirmOpen, setIsLongRestConfirmOpen] = useState(false);
 
   const handleLongRest = () => {
+    const targetHp = maxHp + abilityHpBonus;
+    const targetDt = maxDt + abilityDtBonus;
+    const targetMana = maxMana + abilityManaBonus;
+
     updateChar.mutate({
       id,
       data: {
-        currentHp: maxHp,
-        currentDt: maxDt,
-        currentMana: maxMana
+        currentHp: targetHp,
+        currentDt: targetDt,
+        currentMana: targetMana
       }
     }, {
       onSuccess: () => {
@@ -191,13 +281,13 @@ export default function CharacterSheet() {
         const curDt = currentDt ?? character.currentDt;
         const curMana = mana ?? character.currentMana;
 
-        setHp(maxHp);
-        setCurrentDt(maxDt);
-        setMana(maxMana);
+        setHp(targetHp);
+        setCurrentDt(targetDt);
+        setMana(targetMana);
 
-        createRoll.mutate({ id, data: { diceType: "hp-log", modifier: maxHp - curHp, label: "Long Rest (HP)" } });
-        createRoll.mutate({ id, data: { diceType: "dt-log", modifier: maxDt - curDt, label: "Long Rest (DT)" } });
-        createRoll.mutate({ id, data: { diceType: "mana-log", modifier: maxMana - curMana, label: "Long Rest (Mana)" } });
+        createRoll.mutate({ id, data: { diceType: "hp-log", modifier: targetHp - curHp, label: "Long Rest (HP)" } });
+        createRoll.mutate({ id, data: { diceType: "dt-log", modifier: targetDt - curDt, label: "Long Rest (DT)" } });
+        createRoll.mutate({ id, data: { diceType: "mana-log", modifier: targetMana - curMana, label: "Long Rest (Mana)" } });
         
         toast.success("Long Rest completed. Vitals restored.");
         setIsLongRestConfirmOpen(false);
@@ -240,6 +330,7 @@ export default function CharacterSheet() {
 
   // ── Multiple Familiars HUD & Expansion State ───────────────
   const [expandedFamiliars, setExpandedFamiliars] = useState<Record<string | number, boolean>>({});
+  const [expandedAbilities, setExpandedAbilities] = useState<Record<number, boolean>>({});
   const [famDtFlashes, setFamDtFlashes] = useState<Record<string | number, "hit" | "restore" | null>>({});
   const [famDamageResults, setFamDamageResults] = useState<Record<string | number, { hpLost: number; absorbed: boolean } | null>>({});
   const [famInputs, setFamInputs] = useState<Record<string | number, {
@@ -282,6 +373,18 @@ export default function CharacterSheet() {
   const [famDtFlash, setFamDtFlash] = useState<"hit" | "restore" | null>(null);
   const [damageResult, setDamageResult] = useState<{ hpLost: number; absorbed: boolean } | null>(null);
   const [famDamageResult, setFamDamageResult] = useState<{ hpLost: number; absorbed: boolean } | null>(null);
+
+  // ── New Features State ──
+  const [recentRollActions, setRecentRollActions] = useState<{ diceType: string; label: string; modifier: number }[]>([]);
+  const [discardItem, setDiscardItem] = useState<any | null>(null);
+  const [discardCount, setDiscardCount] = useState<number>(1);
+  const [isDiscardOpen, setIsDiscardOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [noteImages, setNoteImages] = useState<string[]>([]);
+  const [combatants, setCombatants] = useState<Combatant[]>([]);
+  const [currentTurnIdx, setCurrentTurnIdx] = useState<number>(0);
+  const [recentCombatants, setRecentCombatants] = useState<Omit<Combatant, "id">[]>([]);
 
   // ── Inventory Dialog Trigger State ────────────────────────
   const [isInvOpen, setIsInvOpen] = useState(false);
@@ -329,7 +432,23 @@ export default function CharacterSheet() {
   if (!character) return <div className="p-8 text-center text-muted-foreground">Character not found</div>;
 
   // ── Recalculate adjusted stats from equipment ─────────────
-  const { stats: finalStats, modifiers: autoModifiers, diceLabels, maxHp, maxMana, maxDt } = getAdjustedStats(character, equipment, abilities);
+  const { 
+    stats: finalStats, 
+    modifiers: autoModifiers, 
+    diceLabels, 
+    maxHp, 
+    maxMana, 
+    maxDt, 
+    abilityHpBonus, 
+    abilityManaBonus, 
+    abilityDtBonus 
+  } = getAdjustedStats(character, equipment, abilities);
+
+  // Compute base maximums (without active ability bonuses) to identify temporary boosts
+  const baseMaxes = getAdjustedStats(character, equipment, []);
+  const baseMaxHp = baseMaxes.maxHp;
+  const baseMaxMana = baseMaxes.maxMana;
+  const baseMaxDt = baseMaxes.maxDt;
 
   // ── Derived max values for familiar ───────────────────────
   const getFamiliarMaxValues = (fam: Familiar) => {
@@ -409,7 +528,8 @@ export default function CharacterSheet() {
     const amount = parseInt(hpAdd);
     if (isNaN(amount) || amount <= 0) return;
     const cur = hp ?? character.currentHp;
-    const next = Math.min(maxHp, cur + amount);
+    const limit = maxHp + abilityHpBonus;
+    const next = Math.min(limit, cur + amount);
     setHp(next);
     setHpAdd("");
     updateChar.mutate({ id, data: { currentHp: next } });
@@ -440,9 +560,10 @@ export default function CharacterSheet() {
 
   const handleFullRestoreHp = () => {
     const cur = hp ?? character.currentHp;
-    setHp(maxHp);
-    updateChar.mutate({ id, data: { currentHp: maxHp } });
-    createRoll.mutate({ id, data: { diceType: "hp-log", modifier: maxHp - cur, label: "Full Restore HP" } });
+    const limit = maxHp + abilityHpBonus;
+    setHp(limit);
+    updateChar.mutate({ id, data: { currentHp: limit } });
+    createRoll.mutate({ id, data: { diceType: "hp-log", modifier: limit - cur, label: "Full Restore HP" } });
   };
 
   // ── DT Adjustments ────────────────────────────────────────
@@ -466,7 +587,8 @@ export default function CharacterSheet() {
     const amount = parseInt(dtAdd);
     if (isNaN(amount) || amount <= 0) return;
     const cur = currentDt ?? character.currentDt;
-    const next = Math.min(maxDt, cur + amount);
+    const limit = maxDt + abilityDtBonus;
+    const next = Math.min(limit, cur + amount);
     setCurrentDt(next);
     setDtAdd("");
     updateChar.mutate({ id, data: { currentDt: next } });
@@ -486,12 +608,13 @@ export default function CharacterSheet() {
 
   const handleRestoreDt = () => {
     const cur = currentDt ?? character.currentDt;
-    setCurrentDt(maxDt);
+    const limit = maxDt + abilityDtBonus;
+    setCurrentDt(limit);
     setDtFlash("restore");
     setDamageResult(null);
     setTimeout(() => setDtFlash(null), 600);
-    updateChar.mutate({ id, data: { currentDt: maxDt } });
-    createRoll.mutate({ id, data: { diceType: "dt-log", modifier: maxDt - cur, label: "Restore DT" } });
+    updateChar.mutate({ id, data: { currentDt: limit } });
+    createRoll.mutate({ id, data: { diceType: "dt-log", modifier: limit - cur, label: "Restore DT" } });
   };
 
   // ── Mana Adjustments ──────────────────────────────────────
@@ -499,7 +622,8 @@ export default function CharacterSheet() {
     const amount = parseInt(manaAdd);
     if (isNaN(amount) || amount <= 0) return;
     const cur = mana ?? character.currentMana;
-    const next = Math.min(maxMana, cur + amount);
+    const limit = maxMana + abilityManaBonus;
+    const next = Math.min(limit, cur + amount);
     setMana(next);
     setManaAdd("");
     updateChar.mutate({ id, data: { currentMana: next } });
@@ -530,9 +654,10 @@ export default function CharacterSheet() {
 
   const handleFullRestoreMana = () => {
     const cur = mana ?? character.currentMana;
-    setMana(maxMana);
-    updateChar.mutate({ id, data: { currentMana: maxMana } });
-    createRoll.mutate({ id, data: { diceType: "mana-log", modifier: maxMana - cur, label: "Full Restore Mana" } });
+    const limit = maxMana + abilityManaBonus;
+    setMana(limit);
+    updateChar.mutate({ id, data: { currentMana: limit } });
+    createRoll.mutate({ id, data: { diceType: "mana-log", modifier: limit - cur, label: "Full Restore Mana" } });
   };
 
   // ── Multiple Familiars Adjustments Mutator Helper ───────────
@@ -542,7 +667,7 @@ export default function CharacterSheet() {
       // Release familiar
       const filtered = list.filter(f => f.id !== famId);
       updateChar.mutate({ id, data: { familiars: filtered } });
-      toast.success("Companion released.");
+      toast.success("Familiar released.");
     } else {
       // Save familiar modifications
       const idx = list.findIndex(f => f.id === famId);
@@ -724,6 +849,12 @@ export default function CharacterSheet() {
             const chainDie = diceType.split("+").pop() ?? diceType;
             const lbl = label || rollLabel || diceType;
             
+            setRecentRollActions(prev => {
+              const next = { diceType, label: lbl, modifier };
+              const filtered = prev.filter(a => !(a.label === next.label && a.diceType === next.diceType && a.modifier === next.modifier));
+              return [next, ...filtered].slice(0, 10);
+            });
+
             if (wasCrit) {
               setCritChain({ chainCount: 0, chainDie, runningDiceTotal: rolled, modifier, label: lbl, lastRolledValue: rolled });
             } else {
@@ -784,7 +915,7 @@ export default function CharacterSheet() {
     handleRoll(dice, `${item.name} Strike`, border => {}, totalMod);
   };
 
-  const handleAbilityRoll = (ability: Ability) => {
+  const handleAbilityRoll = (ability: Ability, chosenStat?: string) => {
     const curMana = mana ?? character.currentMana;
     if (curMana < ability.cost) {
       toast.error(`Not enough Mana! Requires ${ability.cost} MP (Have ${curMana} MP)`);
@@ -796,9 +927,28 @@ export default function CharacterSheet() {
     updateChar.mutate({ id, data: { currentMana: nextMana } });
 
     if (ability.rollFormula) {
-      const statKey = ability.linkedStat || "spirit";
-      const mod = autoModifiers[statKey] || 0;
-      handleRoll(ability.rollFormula, `${ability.name} Cast`, undefined, mod);
+      let rollFormulaToUse = ability.rollFormula;
+      let statMod = 0;
+
+      if (chosenStat) {
+        // Substitute shorthand "STAT" and "STATr" with the selected stat (e.g., "pow" / "powr")
+        const prefix = chosenStat.substring(0, 3).toLowerCase();
+        rollFormulaToUse = rollFormulaToUse
+          .replace(/STATr/g, `${prefix}r`)
+          .replace(/statr/g, `${prefix}r`)
+          .replace(/STAT/g, prefix)
+          .replace(/stat/g, prefix);
+
+        statMod = autoModifiers[chosenStat] || 0;
+      }
+
+      // Sum all equipped equipment flat modifiers (e.g. +6 Mace)
+      const eqMod = equipment
+        .filter(e => e.equipped)
+        .reduce((sum, item) => sum + (item.modifier || 0), 0);
+
+      const totalMod = statMod + eqMod;
+      handleRoll(rollFormulaToUse, `${ability.name} Cast`, undefined, totalMod);
     } else {
       toast.success(`${ability.name} activated! (-${ability.cost} MP)`);
     }
@@ -812,6 +962,44 @@ export default function CharacterSheet() {
     updateAbilityMut.mutate({
       id: abilityId,
       data: { level: nextLevel }
+    });
+  };
+
+  const toggleAbilityActive = (ability: Ability) => {
+    const nextActive = !ability.active;
+    const oldStats = getAdjustedStats(character, equipment, abilities);
+    const updatedAbilities = abilities.map(a => a.id === ability.id ? { ...a, active: nextActive } : a);
+    const newStats = getAdjustedStats(character, equipment, updatedAbilities);
+
+    const hpDiff = (newStats.maxHp + newStats.abilityHpBonus) - (oldStats.maxHp + oldStats.abilityHpBonus);
+    const manaDiff = (newStats.maxMana + newStats.abilityManaBonus) - (oldStats.maxMana + oldStats.abilityManaBonus);
+    const dtDiff = (newStats.maxDt + newStats.abilityDtBonus) - (oldStats.maxDt + oldStats.abilityDtBonus);
+
+    const newHp = Math.max(0, (hp ?? character.currentHp) + hpDiff);
+    const newMana = Math.max(0, (mana ?? character.currentMana) + manaDiff);
+    const newDt = Math.max(0, (currentDt ?? character.currentDt) + dtDiff);
+
+    updateAbilityMut.mutate({
+      id: ability.id,
+      data: { active: nextActive }
+    }, {
+      onSuccess: () => {
+        updateChar.mutate({
+          id,
+          data: {
+            currentHp: newHp,
+            currentMana: newMana,
+            currentDt: newDt
+          }
+        }, {
+          onSuccess: () => {
+            setHp(newHp);
+            setMana(newMana);
+            setCurrentDt(newDt);
+            toast.success(`${ability.name} ${nextActive ? "activated" : "deactivated"}`);
+          }
+        });
+      }
     });
   };
 
@@ -961,6 +1149,51 @@ export default function CharacterSheet() {
     setIsInvOpen(true);
   };
 
+  const triggerDiscardItem = (item: any) => {
+    setDiscardItem(item);
+    setDiscardCount(1);
+    setIsDiscardOpen(true);
+  };
+
+  const handleConfirmDiscard = () => {
+    if (!discardItem) return;
+    const amountToDiscard = discardCount;
+    const item = discardItem;
+
+    if (amountToDiscard >= item.quantity) {
+      deleteInvItem.mutate({ id: item.id, charId: id }, {
+        onSuccess: () => {
+          setIsDiscardOpen(false);
+          setDiscardItem(null);
+          toast.success(`Discarded all ${item.name}.`);
+        }
+      });
+    } else {
+      const nextQuantity = item.quantity - amountToDiscard;
+      updateInvItem.mutate({
+        id: item.id,
+        data: { quantity: nextQuantity }
+      }, {
+        onSuccess: () => {
+          setIsDiscardOpen(false);
+          setDiscardItem(null);
+          toast.success(`Discarded ${amountToDiscard} ${item.name}.`);
+        }
+      });
+    }
+  };
+
+  const handleDiscardAll = () => {
+    if (!discardItem) return;
+    deleteInvItem.mutate({ id: discardItem.id, charId: id }, {
+      onSuccess: () => {
+        setIsDiscardOpen(false);
+        setDiscardItem(null);
+        toast.success(`Discarded all ${discardItem.name}.`);
+      }
+    });
+  };
+
   // ── Essence Additions ─────────────────────────────────────
   const handleSaveEssence = (e: React.FormEvent) => {
     e.preventDefault();
@@ -992,12 +1225,14 @@ export default function CharacterSheet() {
         content: noteContent,
         category: noteCat,
         tags: [],
+        images: noteImages,
       },
       {
         onSuccess: () => {
           setNoteTitle("");
           setNoteContent("");
           setNoteCat("general");
+          setNoteImages([]);
         }
       }
     );
@@ -1127,10 +1362,22 @@ export default function CharacterSheet() {
     });
   };
 
-  const handleReleaseFamiliar = (famId: string | number) => {
-    if (confirm("Release this familiar companion permanently?")) {
-      updateFamiliarData(famId, null);
+  const handleReleaseFamiliarClick = (famId: string | number) => {
+    setReleasingFamId(famId);
+    setIsReleaseConfirmOpen(true);
+  };
+
+  const handleConfirmFirstRelease = () => {
+    setIsReleaseConfirmOpen(false);
+    setIsReleaseDoubleConfirmOpen(true);
+  };
+
+  const handleConfirmSecondRelease = () => {
+    if (releasingFamId !== null) {
+      updateFamiliarData(releasingFamId, null);
     }
+    setIsReleaseDoubleConfirmOpen(false);
+    setReleasingFamId(null);
   };
 
   const handleCreateFamAbility = (famId: string | number, e: React.FormEvent) => {
@@ -1197,6 +1444,13 @@ export default function CharacterSheet() {
 
   const activeFavorites = getFavorites(character, equipment, abilities);
 
+  const preparedAbilities = abilities?.filter(a => a.level && a.level > 0) || [];
+  const abilityResistances = preparedAbilities.map(a => a.resistances).filter(Boolean).join(", ");
+  const abilityImmunities = preparedAbilities.map(a => a.immunities).filter(Boolean).join(", ");
+
+  const totalResistances = [character.resistances, abilityResistances].filter(Boolean).join(", ");
+  const totalImmunities = [character.immunities, abilityImmunities].filter(Boolean).join(", ");
+
   // Notes Search filter computation
   const filteredNotes = notes.filter(n => {
     const matchSearch = noteSearchQuery.trim() === "" || 
@@ -1219,12 +1473,13 @@ export default function CharacterSheet() {
         </Button>
         <div className="flex items-center gap-2">
           <CustomizeToolDialog />
+          <RollGuideDialog />
           <Button variant="outline" size="sm" onClick={() => exportCharacterJSON(id)} className="h-8 text-xs border-primary/40 text-primary rounded-none cursor-pointer">
-            <Download className="w-3.5 h-3.5 mr-1" /> Export JSON
+            <Download className="w-3.5 h-3.5 mr-1" /> Export Character
           </Button>
           <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".json" className="hidden" />
           <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-8 text-xs border-primary/40 text-primary rounded-none cursor-pointer">
-            <Upload className="w-3.5 h-3.5 mr-1" /> Import JSON
+            <Upload className="w-3.5 h-3.5 mr-1" /> Import Character
           </Button>
           <EditCharacterDialog character={character} />
           <Button variant="destructive" size="icon" className="h-8 w-8 rounded-none cursor-pointer" onClick={handleDelete}>
@@ -1244,27 +1499,58 @@ export default function CharacterSheet() {
             <CardContent className="p-5 space-y-5">
               {/* Profile HUD Row */}
               <div className="flex justify-between items-center flex-wrap gap-4 border-b border-border/30 pb-3">
-                <div>
-                  <h1 className="text-3xl font-serif text-primary font-bold leading-tight">
-                    {character.name}
-                  </h1>
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
-                    {character.race} · {character.rank}
-                  </p>
-                  {(character.resistances || character.immunities) && (
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  {/* Portrait Avatar File Upload */}
+                  <div className="relative group w-16 h-16 rounded-full overflow-hidden border-2 border-primary/55 bg-background flex-shrink-0 flex items-center justify-center cursor-pointer">
+                    {character.avatar ? (
+                      <img src={character.avatar} alt={character.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-muted-foreground text-sm font-bold uppercase">{character.name.substring(0, 2)}</span>
+                    )}
+                    <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white font-bold cursor-pointer">
+                      Change
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const dataUrl = await compressImage(file, 200, 200);
+                              updateChar.mutate({ id, data: { avatar: dataUrl } }, {
+                                onSuccess: () => toast.success("Character portrait updated!")
+                              });
+                            } catch (err) {
+                              toast.error("Failed to upload/compress image.");
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-3xl font-serif text-primary font-bold leading-tight truncate">
+                      {character.name}
+                    </h1>
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
+                      {character.race} · {character.rank}
+                    </p>
+                  {(totalResistances || totalImmunities) && (
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground font-sans mt-2">
-                      {character.resistances && (
+                      {totalResistances && (
                         <span>
-                          <strong className="text-foreground uppercase tracking-wider text-[10px]">Resistances:</strong> {character.resistances}
+                          <strong className="text-foreground uppercase tracking-wider text-[10px]">Resistances:</strong> {totalResistances}
                         </span>
                       )}
-                      {character.immunities && (
+                      {totalImmunities && (
                         <span>
-                          <strong className="text-foreground uppercase tracking-wider text-[10px]">Immunities:</strong> {character.immunities}
+                          <strong className="text-foreground uppercase tracking-wider text-[10px]">Immunities:</strong> {totalImmunities}
                         </span>
                       )}
                     </div>
                   )}
+                  </div>
                 </div>
 
                 {/* Long Rest Confirmation Trigger */}
@@ -1317,14 +1603,21 @@ export default function CharacterSheet() {
                   <div className="text-center py-1">
                     <span className={`text-4xl font-mono font-bold ${
                       dtFlash === "hit" ? "text-destructive" 
-                      : currentDt && currentDt > maxDt ? "text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.3)]" 
+                      : (currentDt ?? character.currentDt) > maxDt ? "text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.3)]" 
                       : "text-foreground"
                     }`}>
                       {currentDt ?? character.currentDt}
                     </span>
-                    <span className="text-xs text-muted-foreground font-mono"> /{maxDt}</span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      /
+                      <span className={maxDt > baseMaxDt ? "text-cyan-400 font-bold drop-shadow-[0_0_5px_rgba(34,211,238,0.4)]" : ""}>
+                        {maxDt}
+                      </span>
+                      {maxDt > baseMaxDt && <span className="text-[9px] text-cyan-400/80 ml-0.5" title={`Stat Boosted Max: +${maxDt - baseMaxDt}`}>(+{maxDt - baseMaxDt})</span>}
+                      {abilityDtBonus > 0 && <span className="text-[9px] text-amber-400/80 ml-0.5" title={`Flat Buff: +${abilityDtBonus}`}>[+{abilityDtBonus} Buff]</span>}
+                    </span>
                   </div>
-                  <ResourceBar current={currentDt ?? character.currentDt} max={maxDt} color={currentDt && currentDt > maxDt ? "#f59e0b" : "hsl(var(--primary))"} />
+                  <ResourceBar current={currentDt ?? character.currentDt} max={maxDt + abilityDtBonus} color={(currentDt ?? character.currentDt) > maxDt ? "#f59e0b" : "hsl(var(--primary))"} />
                   
                   {/* dt quick actions: add/remove/buff */}
                   <div className="space-y-2 mt-1">
@@ -1419,9 +1712,16 @@ export default function CharacterSheet() {
                     <span className={`text-4xl font-mono font-bold ${hp && hp > maxHp ? "text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.3)]" : "text-foreground"}`}>
                       {hp ?? character.currentHp}
                     </span>
-                    <span className="text-xs text-muted-foreground font-mono"> /{maxHp}</span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      /
+                      <span className={maxHp > baseMaxHp ? "text-cyan-400 font-bold drop-shadow-[0_0_5px_rgba(34,211,238,0.4)]" : ""}>
+                        {maxHp}
+                      </span>
+                      {maxHp > baseMaxHp && <span className="text-[9px] text-cyan-400/80 ml-0.5" title={`Stat Boosted Max: +${maxHp - baseMaxHp}`}>(+{maxHp - baseMaxHp})</span>}
+                      {abilityHpBonus > 0 && <span className="text-[9px] text-amber-400/80 ml-0.5" title={`Flat Buff: +${abilityHpBonus}`}>[+{abilityHpBonus} Buff]</span>}
+                    </span>
                   </div>
-                  <ResourceBar current={hp ?? character.currentHp} max={maxHp} color={hp && hp > maxHp ? "#f59e0b" : "hsl(var(--destructive))"} />
+                  <ResourceBar current={hp ?? character.currentHp} max={maxHp + abilityHpBonus} color={hp && hp > maxHp ? "#f59e0b" : "hsl(var(--destructive))"} />
                   
                   {/* hp quick actions: add/remove/buff */}
                   <div className="space-y-2 mt-1">
@@ -1516,9 +1816,16 @@ export default function CharacterSheet() {
                     <span className={`text-4xl font-mono font-bold ${mana && mana > maxMana ? "text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.3)]" : "text-foreground"}`}>
                       {mana ?? character.currentMana}
                     </span>
-                    <span className="text-xs text-muted-foreground font-mono"> /{maxMana}</span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      /
+                      <span className={maxMana > baseMaxMana ? "text-cyan-400 font-bold drop-shadow-[0_0_5px_rgba(34,211,238,0.4)]" : ""}>
+                        {maxMana}
+                      </span>
+                      {maxMana > baseMaxMana && <span className="text-[9px] text-cyan-400/80 ml-0.5" title={`Stat Boosted Max: +${maxMana - baseMaxMana}`}>(+{maxMana - baseMaxMana})</span>}
+                      {abilityManaBonus > 0 && <span className="text-[9px] text-amber-400/80 ml-0.5" title={`Flat Buff: +${abilityManaBonus}`}>[+{abilityManaBonus} Buff]</span>}
+                    </span>
                   </div>
-                  <ResourceBar current={mana ?? character.currentMana} max={maxMana} color={mana && mana > maxMana ? "#f59e0b" : "#3b82f6"} />
+                  <ResourceBar current={mana ?? character.currentMana} max={maxMana + abilityManaBonus} color={mana && mana > maxMana ? "#f59e0b" : "#3b82f6"} />
                   
                   {/* mana quick actions: add/remove/buff */}
                   <div className="space-y-2 mt-1">
@@ -1602,192 +1909,6 @@ export default function CharacterSheet() {
             </CardContent>
           </Card>
 
-          {/* ── Custom Favorites Hotbar ── */}
-          <Card className="bg-card/75 border-border/40 p-4 rounded-none shadow-md">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary" /> Favorites Hotbar
-            </h3>
-            
-            {/* 10 Card Stacked Grid (5-on-5) */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {activeFavorites.map((fav, index) => {
-                if (fav) {
-                  const details = getSlotDetails(fav);
-                  return (
-                    <div 
-                      key={index} 
-                      onClick={() => handleExecuteFavorite(fav)}
-                      className="min-h-[72px] bg-background/60 hover:bg-accent/40 border border-primary/45 hover:border-primary transition-all relative flex flex-col justify-between cursor-pointer p-2.5 rounded-md group shadow-sm"
-                      title={`Favorite #${index + 1}: ${fav.label}`}
-                    >
-                      {/* Delete Slot Button */}
-                      <button
-                        onClick={(e) => handleClearFavorite(index, e)}
-                        className="absolute top-1.5 right-1.5 h-4.5 w-4.5 bg-destructive hover:bg-destructive/95 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-md border border-border cursor-pointer"
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-
-                      {/* Header slot ID + Type badge */}
-                      <div className="flex justify-between items-center w-full">
-                        <span className="text-[9px] font-mono text-muted-foreground/75 font-semibold">#{index + 1}</span>
-                        <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-primary border border-primary/20 px-1 py-0.25 rounded bg-primary/5">
-                          {fav.type === "weapon" ? "Weapon" : fav.type === "ability" ? "Spell" : fav.type === "skill" ? "Skill" : fav.type === "familiar-ability" ? "Fam Ab" : fav.type === "familiar-attribute" ? "Fam Stat" : "Stat"}
-                        </span>
-                      </div>
-
-                      {/* Name Row */}
-                      <div className="text-[11px] font-bold text-foreground truncate max-w-full leading-tight font-serif text-left mt-1">
-                        {details.name}
-                      </div>
-
-                      {/* Footer Cost + Stat */}
-                      <div className="flex justify-between items-center w-full mt-1.5 border-t border-border/20 pt-1 text-[9px] font-mono">
-                        <span className="text-muted-foreground">{details.costStr || "-"}</span>
-                        <span className="text-primary font-bold">{details.statStr || "-"}</span>
-                      </div>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => setAssigningSlotIndex(index)}
-                      className="min-h-[72px] bg-background/20 hover:bg-accent/30 border border-dashed border-border/50 hover:border-primary/50 transition-all flex flex-col items-center justify-center cursor-pointer text-muted-foreground hover:text-primary rounded-md p-3 text-xs gap-1 shadow-sm"
-                      title={`Click to assign Favorite #${index + 1}`}
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span className="text-[10px] font-mono">Assign #{index + 1}</span>
-                    </button>
-                  );
-                }
-              })}
-            </div>
-
-            {/* Favorite Assignment Selection Modal */}
-            <Dialog open={assigningSlotIndex !== null} onOpenChange={(open) => { if(!open) setAssigningSlotIndex(null); }}>
-              <DialogContent className="sm:max-w-[500px] max-h-[75vh] overflow-y-auto bg-card border border-border shadow-2xl rounded-none">
-                <DialogHeader className="border-b border-border/30 pb-2">
-                  <DialogTitle className="font-serif text-2xl text-primary font-bold">
-                    Assign Favorite Slot #{assigningSlotIndex !== null ? assigningSlotIndex + 1 : ""}
-                  </DialogTitle>
-                </DialogHeader>
-
-                <div className="space-y-4 mt-4 text-xs font-sans">
-                  
-                  {/* Attributes */}
-                  <div>
-                    <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Attributes</h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {STATS.map(stat => (
-                        <Button 
-                          key={stat.key} variant="outline" size="sm" className="h-6 text-[10px] font-mono rounded-none"
-                          onClick={() => handleAssignFavorite(assigningSlotIndex!, "attribute", stat.key, stat.label)}
-                        >
-                          {stat.label} (+{autoModifiers[stat.key]})
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Weapons */}
-                  {equipment.filter(e => e.equipped).length > 0 && (
-                    <div>
-                      <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Equipped Weapons / Gear</h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {equipment.filter(e => e.equipped).map(eq => (
-                          <Button 
-                            key={eq.id} variant="outline" size="sm" className="h-6 text-[10px] rounded-none font-serif"
-                            onClick={() => handleAssignFavorite(assigningSlotIndex!, "weapon", eq.id, eq.name)}
-                          >
-                            {eq.name} {eq.diceType ? `(${eq.diceType})` : ""}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Shaped Spells */}
-                  {abilities.length > 0 && (
-                    <div>
-                      <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Shaped Spells</h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {abilities.map(ab => (
-                          <Button 
-                            key={ab.id} variant="outline" size="sm" className="h-6 text-[10px] rounded-none font-serif"
-                            onClick={() => handleAssignFavorite(assigningSlotIndex!, "ability", ab.id, ab.name)}
-                          >
-                            {ab.name}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Custom Skills */}
-                  {skills.length > 0 && (
-                    <div>
-                      <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Custom Skills</h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {skills.map(sk => (
-                          <Button 
-                            key={sk.id} variant="outline" size="sm" className="h-6 text-[10px] rounded-none font-serif"
-                            onClick={() => handleAssignFavorite(assigningSlotIndex!, "skill", sk.id, sk.name)}
-                          >
-                            {sk.name} (-{sk.value})
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Familiar Options (Multiple Companions) */}
-                  {character.familiars && character.familiars.length > 0 && (
-                    <div className="space-y-4 pt-2 border-t border-border/20">
-                      <h4 className="font-bold text-primary uppercase tracking-widest text-[10px]">Companion Familiars</h4>
-                      {character.familiars.map(fam => (
-                        <div key={fam.id} className="space-y-3 bg-background/40 p-2.5 rounded-md border border-border/30">
-                          <h5 className="font-serif font-bold text-xs text-primary">{fam.name} ({fam.race})</h5>
-                          <div>
-                            <h6 className="font-bold text-[9px] text-muted-foreground uppercase block mb-1">Attributes</h6>
-                            <div className="flex flex-wrap gap-1">
-                              {STATS.map(stat => {
-                                const val = (fam as any)[stat.key] as number;
-                                return (
-                                  <Button 
-                                    key={stat.key} variant="outline" size="sm" className="h-6 text-[9px] rounded-md font-mono"
-                                    onClick={() => handleAssignFavorite(assigningSlotIndex!, "familiar-attribute", stat.key, `${fam.name}:${stat.label}`, fam.id)}
-                                  >
-                                    {stat.label} (+{Math.floor(val/3)})
-                                  </Button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          {fam.abilities && fam.abilities.length > 0 && (
-                            <div>
-                              <h6 className="font-bold text-[9px] text-muted-foreground uppercase block mb-1">Abilities</h6>
-                              <div className="flex flex-wrap gap-1">
-                                {fam.abilities.map(ab => (
-                                  <Button 
-                                    key={ab.id} variant="outline" size="sm" className="h-6 text-[9px] rounded-md font-serif"
-                                    onClick={() => handleAssignFavorite(assigningSlotIndex!, "familiar-ability", ab.id, `${fam.name}:${ab.name}`, fam.id)}
-                                  >
-                                    {ab.name}
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                </div>
-              </DialogContent>
-            </Dialog>
-          </Card>
         </div>
 
         {/* COLUMN 2: DICE HUD (1/3 width) */}
@@ -1920,6 +2041,33 @@ export default function CharacterSheet() {
                 )}
               </div>
 
+              {/* Recent Actions Section */}
+              <div className="space-y-1.5 border-t border-border/30 pt-3">
+                <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                  <RotateCcw className="w-3 h-3 text-primary animate-pulse" /> Recent Actions
+                </h5>
+                {recentRollActions.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 max-h-[85px] overflow-y-auto pr-1">
+                    {recentRollActions.map((action, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleRoll(action.diceType, action.label, undefined, action.modifier)}
+                        className="text-[9px] font-mono border border-border/40 bg-background/40 hover:border-primary/50 px-2 py-1 flex items-center gap-1.5 rounded transition-all cursor-pointer text-foreground hover:bg-primary/5"
+                        title={`Roll again: ${action.label} (${action.diceType}${action.modifier ? (action.modifier > 0 ? `+${action.modifier}` : action.modifier) : ""})`}
+                      >
+                        <Dice5 className="w-2.5 h-2.5 text-primary" />
+                        <span className="truncate max-w-[80px] font-sans font-semibold">{action.label}</span>
+                        <span className="text-muted-foreground/80">
+                          {action.diceType}{action.modifier ? (action.modifier > 0 ? `+${action.modifier}` : action.modifier) : ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[9px] text-muted-foreground/60 italic font-serif">No recent actions.</p>
+                )}
+              </div>
+
               {/* LCD-Style Dice HUD Roll Screen */}
               <div
                 className="p-4 border-2 border-slate-700/60 rounded-md text-center flex flex-col items-center justify-center transition-all duration-500 min-h-[150px] mt-4 bg-[#0c100e] shadow-[inset_0_0_15px_rgba(0,0,0,0.95)] relative overflow-hidden group"
@@ -2015,6 +2163,194 @@ export default function CharacterSheet() {
 
       </div>
 
+      {/* ── Custom Favorites Hotbar ── */}
+      <div className="mt-6">
+        <Card className="bg-card/75 border-border/40 p-4 rounded-none shadow-md">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" /> Favorites Hotbar
+          </h3>
+          
+          {/* 20 Card Grid (10-on-10 on desktop, 5-on-4 on mobile) */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-3">
+            {activeFavorites.map((fav, index) => {
+              if (fav) {
+                const details = getSlotDetails(fav);
+                return (
+                  <div 
+                    key={index} 
+                    onClick={() => handleExecuteFavorite(fav)}
+                    className="min-h-[72px] bg-background/60 hover:bg-accent/40 border border-primary/45 hover:border-primary transition-all relative flex flex-col justify-between cursor-pointer p-2 rounded-md group shadow-sm"
+                    title={`Favorite #${index + 1}: ${fav.label}`}
+                  >
+                    {/* Delete Slot Button */}
+                    <button
+                      onClick={(e) => handleClearFavorite(index, e)}
+                      className="absolute top-1 right-1 h-4 w-4 bg-destructive hover:bg-destructive/95 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded border border-border cursor-pointer"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+
+                    {/* Header slot ID + Type badge */}
+                    <div className="flex justify-between items-center w-full">
+                      <span className="text-[8px] font-mono text-muted-foreground/75 font-semibold">#{index + 1}</span>
+                      <span className="text-[7px] font-mono font-bold uppercase tracking-wider text-primary border border-primary/20 px-1 py-0.25 rounded bg-primary/5">
+                        {fav.type === "weapon" ? "Weapon" : fav.type === "ability" ? "Spell" : fav.type === "skill" ? "Skill" : fav.type === "familiar-ability" ? "Fam Ab" : fav.type === "familiar-attribute" ? "Fam Stat" : "Stat"}
+                      </span>
+                    </div>
+
+                    {/* Name Row */}
+                    <div className="text-[10px] font-bold text-foreground truncate max-w-full leading-tight font-serif text-left mt-1">
+                      {details.name}
+                    </div>
+
+                    {/* Footer Cost + Stat */}
+                    <div className="flex justify-between items-center w-full mt-1 border-t border-border/20 pt-1 text-[8px] font-mono">
+                      <span className="text-muted-foreground">{details.costStr || "-"}</span>
+                      <span className="text-primary font-bold">{details.statStr || "-"}</span>
+                    </div>
+                  </div>
+                );
+              } else {
+                return (
+                  <button
+                    key={index}
+                    onClick={() => setAssigningSlotIndex(index)}
+                    className="min-h-[72px] bg-background/20 hover:bg-accent/30 border border-dashed border-border/50 hover:border-primary/50 transition-all flex flex-col items-center justify-center cursor-pointer text-muted-foreground hover:text-primary rounded-md p-2 text-center text-xs gap-1 shadow-sm"
+                    title={`Click to assign Favorite #${index + 1}`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="text-[8px] font-mono">Assign #{index + 1}</span>
+                  </button>
+                );
+              }
+            })}
+          </div>
+
+          {/* Favorite Assignment Selection Modal */}
+          <Dialog open={assigningSlotIndex !== null} onOpenChange={(open) => { if(!open) setAssigningSlotIndex(null); }}>
+            <DialogContent className="sm:max-w-[500px] max-h-[75vh] overflow-y-auto bg-card border border-border shadow-2xl rounded-none">
+              <DialogHeader className="border-b border-border/30 pb-2">
+                <DialogTitle className="font-serif text-2xl text-primary font-bold">
+                  Assign Favorite Slot #{assigningSlotIndex !== null ? assigningSlotIndex + 1 : ""}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4 mt-4 text-xs font-sans">
+                
+                {/* Attributes */}
+                <div>
+                  <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Attributes</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {STATS.map(stat => (
+                      <Button 
+                        key={stat.key} variant="outline" size="sm" className="h-6 text-[10px] font-mono rounded-none"
+                        onClick={() => handleAssignFavorite(assigningSlotIndex!, "attribute", stat.key, stat.label)}
+                      >
+                        {stat.label} (+{autoModifiers[stat.key]})
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Weapons */}
+                {equipment.filter(e => e.equipped).length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Equipped Weapons / Gear</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {equipment.filter(e => e.equipped).map(eq => (
+                        <Button 
+                          key={eq.id} variant="outline" size="sm" className="h-6 text-[10px] rounded-none font-serif"
+                          onClick={() => handleAssignFavorite(assigningSlotIndex!, "weapon", eq.id, eq.name)}
+                        >
+                          {eq.name} {eq.diceType ? `(${eq.diceType})` : ""}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shaped Spells */}
+                {abilities.length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Shaped Spells</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {abilities.map(ab => (
+                        <Button 
+                          key={ab.id} variant="outline" size="sm" className="h-6 text-[10px] rounded-none font-serif"
+                          onClick={() => handleAssignFavorite(assigningSlotIndex!, "ability", ab.id, ab.name)}
+                        >
+                          {ab.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Skills */}
+                {skills.length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Custom Skills</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {skills.map(sk => (
+                        <Button 
+                          key={sk.id} variant="outline" size="sm" className="h-6 text-[10px] rounded-none font-serif"
+                          onClick={() => handleAssignFavorite(assigningSlotIndex!, "skill", sk.id, sk.name)}
+                        >
+                          {sk.name} (-{sk.value})
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Familiar Options (Multiple Companions) */}
+                {character.familiars && character.familiars.length > 0 && (
+                  <div className="space-y-4 pt-2 border-t border-border/20">
+                    <h4 className="font-bold text-primary uppercase tracking-widest text-[10px]">Companion Familiars</h4>
+                    {character.familiars.map(fam => (
+                      <div key={fam.id} className="space-y-3 bg-background/40 p-2.5 rounded-md border border-border/30">
+                        <h5 className="font-serif font-bold text-xs text-primary">{fam.name} ({fam.race})</h5>
+                        <div>
+                          <h6 className="font-bold text-[9px] text-muted-foreground uppercase block mb-1">Attributes</h6>
+                          <div className="flex flex-wrap gap-1">
+                            {STATS.map(stat => {
+                              const val = (fam as any)[stat.key] as number;
+                              return (
+                                <Button 
+                                  key={stat.key} variant="outline" size="sm" className="h-6 text-[9px] rounded-md font-mono"
+                                  onClick={() => handleAssignFavorite(assigningSlotIndex!, "familiar-attribute", stat.key, `${fam.name}:${stat.label}`, fam.id)}
+                                >
+                                  {stat.label} (+{Math.floor(val/3)})
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        {fam.abilities && fam.abilities.length > 0 && (
+                          <div>
+                            <h6 className="font-bold text-[9px] text-muted-foreground uppercase block mb-1">Abilities</h6>
+                            <div className="flex flex-wrap gap-1">
+                              {fam.abilities.map(ab => (
+                                <Button 
+                                  key={ab.id} variant="outline" size="sm" className="h-6 text-[9px] rounded-md font-serif"
+                                  onClick={() => handleAssignFavorite(assigningSlotIndex!, "familiar-ability", ab.id, `${fam.name}:${ab.name}`, fam.id)}
+                                >
+                                  {ab.name}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              </div>
+            </DialogContent>
+          </Dialog>
+        </Card>
+
       {/* ── TABBED TOOL SCREEN BAR ── */}
       <div className="flex gap-1 border-b border-border/40 mt-6 overflow-x-auto pb-1 flex-wrap">
         {[
@@ -2024,7 +2360,8 @@ export default function CharacterSheet() {
           { key: "essences", label: "Essence Confluence", icon: Layers },
           { key: "abilities", label: "Abilities", icon: Flame },
           { key: "notes", label: "Campaign Notes", icon: BookText },
-          { key: "familiar", label: "Companion Familiar", icon: UserCheck }
+          { key: "familiar", label: "Familiars", icon: UserCheck },
+          { key: "combat", label: "Combat Tracker", icon: Swords }
         ].map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -2324,7 +2661,20 @@ export default function CharacterSheet() {
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-primary rounded-none cursor-pointer" onClick={() => triggerEditInventory("item", item)}>
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive rounded-none cursor-pointer" onClick={() => deleteEq.mutate({ id: item.id, charId: id })}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 text-destructive rounded-none cursor-pointer" 
+                            onClick={() => {
+                              if (item.quantity > 1) {
+                                triggerDiscardItem(item);
+                              } else {
+                                deleteInvItem.mutate({ id: item.id, charId: id }, {
+                                  onSuccess: () => toast.success(`Discarded ${item.name}.`)
+                                });
+                              }
+                            }}
+                          >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
@@ -2430,27 +2780,56 @@ export default function CharacterSheet() {
 
         {/* TAB 5: ABILITIES */}
         {activeTab === "abilities" && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex justify-between items-center border-b border-border/20 pb-2">
-              <h3 className="text-lg font-serif text-primary font-bold">Abilities</h3>
+              <h3 className="text-xl font-serif text-primary font-bold">Shaped Abilities</h3>
               <EditAbilitiesDialog characterId={id} />
             </div>
 
-            {abilities && abilities.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {abilities.map((ability) => (
-                  <Card key={ability.id} className="bg-card border-border/50 rounded-md">
+            {(() => {
+              // Helper to render ability card
+              const renderAbilityCard = (ability: Ability) => {
+                const isExpanded = !!expandedAbilities[ability.id];
+                
+                // Collect and format flat bonuses to display
+                const bonuses: string[] = [];
+                if (ability.bonusPower) bonuses.push(`+${ability.bonusPower} POW`);
+                if (ability.bonusVitality) bonuses.push(`+${ability.bonusVitality} VIT`);
+                if (ability.bonusSpirit) bonuses.push(`+${ability.bonusSpirit} SPI`);
+                if (ability.bonusAgility) bonuses.push(`+${ability.bonusAgility} AGI`);
+                if (ability.bonusEndurance) bonuses.push(`+${ability.bonusEndurance} END`);
+                if (ability.bonusPrecision) bonuses.push(`+${ability.bonusPrecision} PRE`);
+                if (ability.bonusWillpower) bonuses.push(`+${ability.bonusWillpower} WIL`);
+                if (ability.bonusCharisma) bonuses.push(`+${ability.bonusCharisma} CHA`);
+                if (ability.bonusHp) bonuses.push(`+${ability.bonusHp} Max HP`);
+                if (ability.bonusMana) bonuses.push(`+${ability.bonusMana} Max Mana`);
+                if (ability.bonusDt) bonuses.push(`+${ability.bonusDt} Max DT`);
+                if (ability.resistances) bonuses.push(`Resistances: ${ability.resistances}`);
+                if (ability.immunities) bonuses.push(`Immunities: ${ability.immunities}`);
+
+                return (
+                  <Card key={ability.id} className="bg-card border border-border/40 hover:border-primary/20 transition-all rounded-md overflow-hidden">
                     <CardContent className="p-4 space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-serif text-xl font-bold text-primary leading-tight">{ability.name}</h4>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {/* Header row (Clickable card body toggles expansion except buttons) */}
+                      <div 
+                        className="flex justify-between items-start cursor-pointer select-none"
+                        onClick={() => setExpandedAbilities(prev => ({ ...prev, [ability.id]: !isExpanded }))}
+                      >
+                        <div className="space-y-1.5 flex-1 pr-4">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-serif text-lg font-bold text-primary leading-tight hover:text-primary/80 transition-colors">
+                              {ability.name}
+                            </h4>
+                            <svg className={`w-3.5 h-3.5 text-muted-foreground/60 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <Badge variant="outline" className="text-[9px] font-mono border-primary/20 text-primary rounded-md bg-background/50">{ability.cost} MP</Badge>
                             <Badge variant="outline" className="text-[9px] font-mono border-border/60 text-muted-foreground rounded-md bg-background/50">{ability.range}</Badge>
                             <Badge variant="outline" className="text-[9px] font-mono border-border/60 text-muted-foreground rounded-md bg-background/50">{ability.speed}</Badge>
                             
                             {/* Level Incrementer */}
-                            <div className="flex items-center gap-1 border border-border/50 px-1.5 py-0.5 rounded-md bg-background/50 text-[10px] font-semibold text-foreground font-mono">
+                            <div className="flex items-center gap-1 border border-border/50 px-1.5 py-0.5 rounded-md bg-background/50 text-[10px] font-semibold text-foreground font-mono" onClick={e => e.stopPropagation()}>
                               <span>Lvl: {ability.level || 1}</span>
                               <button 
                                 type="button"
@@ -2467,31 +2846,143 @@ export default function CharacterSheet() {
                                 +
                               </button>
                             </div>
+
+                            {/* Active Toggle Switch */}
+                            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => toggleAbilityActive(ability)}
+                                className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase transition-all border cursor-pointer ${
+                                  ability.active 
+                                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 drop-shadow-[0_0_4px_rgba(16,185,129,0.3)]" 
+                                    : "bg-background/40 border-border/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                                }`}
+                              >
+                                {ability.active ? "Active" : "Inactive"}
+                              </button>
+                            </div>
                           </div>
                         </div>
 
-                        <Button
-                          size="sm"
-                          onClick={() => handleAbilityRoll(ability)}
-                          className="bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 h-8 font-serif rounded-md cursor-pointer"
-                        >
-                          <Dice5 className="w-3.5 h-3.5 mr-1" /> Use Ability
-                        </Button>
+                        {/* Action Roll Buttons (Prevent Card Click Toggle) */}
+                        <div className="flex flex-col gap-1.5" onClick={e => e.stopPropagation()}>
+                          {ability.linkedStats && ability.linkedStats.length > 0 ? (
+                            ability.linkedStats.map(statKey => (
+                              <Button
+                                key={statKey}
+                                size="sm"
+                                onClick={() => handleAbilityRoll(ability, statKey)}
+                                className="bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 h-7 text-xs font-serif rounded-md cursor-pointer whitespace-nowrap"
+                              >
+                                <Dice5 className="w-3 h-3 mr-1" /> Roll ({statKey.substring(0, 3).toUpperCase()})
+                              </Button>
+                            ))
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => handleAbilityRoll(ability)}
+                              className="bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 h-7 text-xs font-serif rounded-md cursor-pointer"
+                            >
+                              <Dice5 className="w-3 h-3 mr-1" /> Use Ability
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
-                      <div
-                        className="text-xs text-muted-foreground font-serif leading-relaxed border-t border-border/30 pt-3 whitespace-pre-wrap"
-                        dangerouslySetInnerHTML={{ __html: parseMarkdown(ability.description) }}
-                      />
+                      {/* Expandable Content (Markdown + Stats + Formulas) */}
+                      {isExpanded && (
+                        <div className="border-t border-border/20 pt-3 space-y-2.5 animate-in slide-in-from-top-2 duration-200">
+                          {ability.rollFormula && (
+                            <div className="text-[10px] font-mono text-muted-foreground bg-background/50 border border-border/30 px-2.5 py-1.5 rounded-md flex items-center justify-between">
+                              <span>Formula: <code className="text-primary font-bold">{ability.rollFormula}</code></span>
+                            </div>
+                          )}
+
+                          {bonuses.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 text-[9px]">
+                              {bonuses.map((b, idx) => (
+                                <Badge key={idx} variant="outline" className="border-emerald-500/20 text-emerald-500 rounded bg-emerald-500/[0.03] uppercase tracking-wider font-bold">
+                                  {b}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+
+                          <div
+                            className="text-xs text-muted-foreground font-serif leading-relaxed whitespace-pre-wrap pl-1"
+                            dangerouslySetInnerHTML={{ __html: parseMarkdown(ability.description || "*No description.*") }}
+                          />
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-10 bg-card/30 border border-dashed border-border/40 rounded-md text-sm text-muted-foreground/60 italic font-serif">
-                No abilities registered yet. Click "Edit Abilities" to manage.
-              </div>
-            )}
+                );
+              };
+
+              // Group abilities by Essence Slot
+              const slots = [1, 2, 3, 4];
+              const grouped = slots.map(slotNum => {
+                const ess = essences?.find(e => e.slot === slotNum);
+                const label = slotNum === 1 ? "First Essence" : slotNum === 2 ? "Second Essence" : slotNum === 3 ? "Third Essence" : "Confluence";
+                const attachedAbilities = abilities?.filter(a => ess && a.essenceId === ess.id) || [];
+                return { slotNum, ess, label, abilities: attachedAbilities };
+              });
+
+              const unassignedAbilities = abilities?.filter(a => !a.essenceId || !essences?.some(e => e.id === a.essenceId)) || [];
+
+              return (
+                <div className="space-y-6">
+                  {/* Essence Groups */}
+                  {grouped.map(({ slotNum, ess, label, abilities: attached }) => {
+                    if (!ess) return null; // Only show attuned Essence slots
+                    return (
+                      <div key={slotNum} className="space-y-3 border-l-2 border-primary/20 pl-4 py-1">
+                        <div className="flex justify-between items-baseline border-b border-border/20 pb-1.5 flex-wrap gap-2">
+                          <h4 className="font-serif text-lg font-bold text-primary flex items-center gap-2">
+                            <span>{label}: {ess.name}</span>
+                          </h4>
+                          <span className="text-[10px] font-mono text-muted-foreground font-semibold">
+                            Shaped Abilities: {attached.length} / 5
+                          </span>
+                        </div>
+
+                        {attached.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {attached.map(renderAbilityCard)}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/60 italic font-serif py-2">
+                            No abilities shaped to this Essence. (Max 5)
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Unassigned Group */}
+                  {unassignedAbilities.length > 0 && (
+                    <div className="space-y-3 border-l-2 border-border/20 pl-4 py-1">
+                      <div className="flex justify-between items-baseline border-b border-border/20 pb-1.5">
+                        <h4 className="font-serif text-lg font-bold text-muted-foreground">Unassigned Abilities</h4>
+                        <span className="text-[10px] font-mono text-muted-foreground font-semibold">
+                          Total: {unassignedAbilities.length}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {unassignedAbilities.map(renderAbilityCard)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty State when no abilities exist at all */}
+                  {(!abilities || abilities.length === 0) && (
+                    <div className="text-center py-12 bg-card/30 border border-dashed border-border-border/40 rounded-md text-sm text-muted-foreground/60 italic font-serif">
+                      No abilities registered yet. Click "Edit Abilities" to manage your spellbook.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -2522,11 +3013,46 @@ export default function CharacterSheet() {
                           <option value="npc">PERSON / NPC</option>
                           <option value="item">THING / ITEM</option>
                           <option value="lore">FACT / LORE</option>
+                          <option value="bestiary">BESTIARY</option>
                         </select>
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Content</label>
-                        <Textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} placeholder="Write thoughts..." className="bg-background min-h-[120px] text-sm font-serif rounded-none" />
+                        <Textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} placeholder="Write thoughts..." className="bg-background min-h-[100px] text-sm font-serif rounded-none" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Attach Images</label>
+                        <Input 
+                          type="file" 
+                          accept="image/*" 
+                          multiple
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files || []);
+                            try {
+                              const compressed = await Promise.all(files.map(f => compressImage(f, 600, 600)));
+                              setNoteImages(prev => [...prev, ...compressed]);
+                            } catch (err) {
+                              toast.error("Failed to load/compress note images.");
+                            }
+                          }}
+                          className="bg-background text-sm rounded-none h-8 text-xs file:bg-primary file:text-primary-foreground file:border-0 file:px-2 file:py-1 file:cursor-pointer"
+                        />
+                        {noteImages.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {noteImages.map((img, idx) => (
+                              <div key={idx} className="relative w-10 h-10 border border-border rounded overflow-hidden group">
+                                <img src={img} className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => setNoteImages(prev => prev.filter((_, i) => i !== idx))}
+                                  className="absolute top-0.5 right-0.5 bg-destructive text-destructive-foreground w-3.5 h-3.5 flex items-center justify-center rounded-full text-[9px] hover:bg-destructive/80"
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <Button type="submit" size="sm" className="w-full bg-primary text-primary-foreground font-serif rounded-none cursor-pointer">Save Entry</Button>
                     </form>
@@ -2545,7 +3071,7 @@ export default function CharacterSheet() {
                     className="bg-background/50 border-border/50 text-xs rounded-none h-8 flex-1"
                   />
                   <div className="flex gap-1 flex-wrap">
-                    {["all", "general", "npc", "location", "item", "lore"].map(cat => (
+                    {["all", "general", "npc", "location", "item", "lore", "bestiary"].map(cat => (
                       <button
                         key={cat}
                         onClick={() => setNoteCategoryFilter(cat)}
@@ -2555,7 +3081,7 @@ export default function CharacterSheet() {
                             : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent/30"
                         }`}
                       >
-                        {cat === "all" ? "All" : cat === "npc" ? "People" : cat === "location" ? "Places" : cat === "item" ? "Things" : cat === "lore" ? "Facts" : "Gen"}
+                        {cat === "all" ? "All" : cat === "npc" ? "People" : cat === "location" ? "Places" : cat === "item" ? "Things" : cat === "lore" ? "Facts" : cat === "bestiary" ? "Bestiary" : "Gen"}
                       </button>
                     ))}
                   </div>
@@ -2575,11 +3101,27 @@ export default function CharacterSheet() {
                             <div>
                               <h4 className="font-serif text-lg font-bold text-primary">{note.title}</h4>
                               <Badge variant="outline" className="text-[8px] uppercase tracking-wider text-muted-foreground mt-1 border-border/50 rounded-md bg-background/50">
-                                {note.category === "npc" ? "👤 Person / NPC" : note.category === "location" ? "📍 Place / Location" : note.category === "item" ? "📦 Thing / Item" : note.category === "lore" ? "📜 Fact / Lore" : "📝 General"}
+                                {note.category === "npc" ? "👤 Person / NPC" : note.category === "location" ? "📍 Place / Location" : note.category === "item" ? "📦 Thing / Item" : note.category === "lore" ? "📜 Fact / Lore" : note.category === "bestiary" ? "🐉 Bestiary" : "📝 General"}
                               </Badge>
                             </div>
                           </div>
                           <p className="text-xs text-muted-foreground/80 font-serif leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                          {note.images && note.images.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3 border-t border-border/20 pt-3">
+                              {note.images.map((imgUrl, imgIdx) => (
+                                <div 
+                                  key={imgIdx} 
+                                  onClick={() => {
+                                    setLightboxImage(imgUrl);
+                                    setIsLightboxOpen(true);
+                                  }}
+                                  className="relative w-16 h-16 border border-border/40 rounded overflow-hidden cursor-pointer hover:border-primary/50 transition-all bg-background"
+                                >
+                                  <img src={imgUrl} className="w-full h-full object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))
@@ -2602,8 +3144,8 @@ export default function CharacterSheet() {
                 <CardContent className="p-6 space-y-6">
                   <div className="flex justify-between items-center border-b border-border/30 pb-3">
                     <div>
-                      <h3 className="font-serif text-2xl text-primary font-bold">Add Companion Familiar</h3>
-                      <p className="text-xs text-muted-foreground mt-1">Companions share your adventure and can execute actions and attacks directly from your Hotbar.</p>
+                      <h3 className="font-serif text-2xl text-primary font-bold">Add Familiar</h3>
+                      <p className="text-xs text-muted-foreground mt-1">Familiars share your adventure and can execute actions and attacks directly from your Hotbar.</p>
                     </div>
                     {character.familiars && character.familiars.length > 0 && (
                       <Button variant="ghost" size="sm" onClick={() => setIsAddingFamiliar(false)} className="rounded-md">Cancel</Button>
@@ -2615,7 +3157,7 @@ export default function CharacterSheet() {
                     {/* Basic specs */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div>
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Companion Name</label>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Familiar Name</label>
                         <Input value={famName} onChange={e => setFamName(e.target.value)} required placeholder="e.g. Rocky, Hedwig" className="bg-background rounded-md h-8 text-sm" />
                       </div>
                       <div>
@@ -2709,7 +3251,7 @@ export default function CharacterSheet() {
                 
                 {/* Toolbar */}
                 <div className="flex justify-between items-center border-b border-border/20 pb-3">
-                  <h3 className="font-serif text-2xl text-primary font-bold">Companion Familiars ({character.familiars.length})</h3>
+                  <h3 className="font-serif text-2xl text-primary font-bold">Familiars ({character.familiars.length})</h3>
                   <Button onClick={() => setIsAddingFamiliar(true)} className="bg-primary text-primary-foreground font-serif rounded-md cursor-pointer">
                     <Plus className="w-4 h-4 mr-1.5" /> Add Familiar
                   </Button>
@@ -2730,11 +3272,40 @@ export default function CharacterSheet() {
                         
                         {/* Title Banner */}
                         <div className="flex justify-between items-start flex-wrap gap-4 border-b border-border/20 pb-3">
-                          <div>
-                            <h4 className="font-serif text-xl text-primary font-bold">{fam.name}</h4>
-                            <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
-                              {fam.race} · {fam.className} · {fam.speed} ft
-                            </p>
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
+                            {/* Familiar Avatar Portrait Upload */}
+                            <div className="relative group w-14 h-14 rounded-full overflow-hidden border border-border/60 bg-background flex-shrink-0 flex items-center justify-center cursor-pointer">
+                              {fam.avatar ? (
+                                <img src={fam.avatar} alt={fam.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-muted-foreground text-xs font-bold uppercase">{fam.name.substring(0, 2)}</span>
+                              )}
+                              <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[8px] text-white font-bold cursor-pointer">
+                                Change
+                                <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  className="hidden" 
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      try {
+                                        const dataUrl = await compressImage(file, 200, 200);
+                                        updateFamiliarData(fam.id, { ...fam, avatar: dataUrl });
+                                        toast.success("Familiar portrait updated!");
+                                      } catch (err) {
+                                        toast.error("Failed to upload/compress image.");
+                                      }
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-serif text-xl text-primary font-bold truncate">{fam.name}</h4>
+                              <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1 truncate">
+                                {fam.race} · {fam.className} · {fam.speed} ft
+                              </p>
                             {(fam.resistances || fam.immunities) && (
                               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground font-sans mt-2">
                                 {fam.resistances && (
@@ -2750,11 +3321,15 @@ export default function CharacterSheet() {
                               </div>
                             )}
                           </div>
+                        </div>
                           
-                          <Button variant="outline" size="sm" className="border-destructive/40 text-destructive hover:bg-destructive/10 rounded-md cursor-pointer h-8 text-xs font-bold" 
-                            onClick={() => handleReleaseFamiliar(fam.id)}>
-                            Release Companion
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <EditFamiliarDialog familiar={fam} onSave={(updated) => updateFamiliarData(fam.id, updated)} />
+                            <Button variant="outline" size="sm" className="border-destructive/40 text-destructive hover:bg-destructive/10 rounded-md cursor-pointer h-8 text-xs font-bold" 
+                              onClick={() => handleReleaseFamiliarClick(fam.id)}>
+                              Release Familiar
+                            </Button>
+                          </div>
                         </div>
 
                         {/* Resource HUD Columns (DT, HP, Mana) */}
@@ -2767,7 +3342,7 @@ export default function CharacterSheet() {
                             : "border-border/40"
                           }`}>
                             <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                              <Shield className="w-4 h-4 text-primary" /> Companion DT
+                              <Shield className="w-4 h-4 text-primary" /> Familiar DT
                             </div>
                             <div className="text-center py-1">
                               <span className={`text-4xl font-mono font-bold ${flash === "hit" ? "text-destructive" : "text-foreground"}`}>
@@ -2829,7 +3404,7 @@ export default function CharacterSheet() {
                           {/* 2. HP (Health) */}
                           <div className="rounded-md border border-border/40 p-3 flex flex-col justify-between gap-3 bg-background/20">
                             <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                              <Heart className="w-4 h-4 text-destructive" /> Companion HP
+                              <Heart className="w-4 h-4 text-destructive" /> Familiar HP
                             </div>
                             <div className="text-center py-1">
                               <span className="text-4xl font-mono font-bold text-foreground">
@@ -2885,7 +3460,7 @@ export default function CharacterSheet() {
                           {/* 3. Mana (MP) */}
                           <div className="rounded-md border border-border/40 p-3 flex flex-col justify-between gap-3 bg-background/20">
                             <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                              <Sparkles className="w-4 h-4 text-blue-400" /> Companion Mana
+                              <Sparkles className="w-4 h-4 text-blue-400" /> Familiar Mana
                             </div>
                             <div className="text-center py-1">
                               <span className="text-4xl font-mono font-bold text-foreground">
@@ -3072,6 +3647,378 @@ export default function CharacterSheet() {
           </div>
         )}
 
+        {/* TAB 8: COMBAT TRACKER */}
+        {activeTab === "combat" && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-border/20 pb-3 flex-wrap gap-4">
+              <div>
+                <h3 className="font-serif text-2xl text-primary font-bold">Combat Tracker</h3>
+                <p className="text-xs text-muted-foreground mt-1">Track turn initiatives, active statuses, and order of combatants.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => {
+                    setCombatants([]);
+                    setCurrentTurnIdx(0);
+                    toast.success("Combat cleared.");
+                  }}
+                  className="rounded-md border-destructive/40 text-destructive hover:bg-destructive/10"
+                >
+                  Clear Tracker
+                </Button>
+                <Button 
+                  size="sm"
+                  onClick={() => {
+                    if (combatants.length === 0) return;
+                    setCurrentTurnIdx(prev => (prev + 1) % combatants.length);
+                  }}
+                  disabled={combatants.length === 0}
+                  className="bg-primary text-primary-foreground font-serif rounded-md"
+                >
+                  Next Turn →
+                </Button>
+              </div>
+            </div>
+
+            {/* Import options & Form row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              
+              {/* Form & Imports Column */}
+              <div className="space-y-4 lg:col-span-1">
+                <Card className="bg-card border-border/50 rounded-md p-4 space-y-4 shadow-sm">
+                  <h4 className="font-serif text-sm font-bold text-primary uppercase tracking-widest border-b border-border/30 pb-2">Add Combatants</h4>
+                  
+                  {/* Quick Imports */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase block">Quick Import</label>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() => {
+                          const existing = combatants.find(c => c.name === character.name);
+                          if (existing) {
+                            toast.error(`${character.name} already in combat.`);
+                            return;
+                          }
+                          const newC: Combatant = {
+                            id: `pc-${character.id}-${Date.now()}`,
+                            name: character.name,
+                            initiative: 10 + (autoModifiers.agility || 0),
+                            statuses: []
+                          };
+                          setCombatants(prev => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
+                          toast.success(`Imported ${character.name}!`);
+                        }}
+                        className="text-[10px] py-1 h-7 border-primary/40 text-primary hover:bg-primary/5 rounded"
+                      >
+                        + Import {character.name} (PC)
+                      </Button>
+
+                      {character.familiars && character.familiars.map(fam => (
+                        <Button
+                          key={fam.id}
+                          size="xs"
+                          variant="outline"
+                          onClick={() => {
+                            const newC: Combatant = {
+                              id: `fam-${fam.id}-${Date.now()}`,
+                              name: fam.name,
+                              initiative: 10 + Math.floor(fam.agility / 3),
+                              statuses: []
+                            };
+                            setCombatants(prev => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
+                            toast.success(`Imported familiar ${fam.name}!`);
+                          }}
+                          className="text-[10px] py-1 h-7 border-primary/40 text-primary hover:bg-primary/5 rounded"
+                        >
+                          + Import {fam.name}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {/* Notes Bestiary Import Selector */}
+                    {notes.filter(n => n.category === "bestiary").length > 0 && (
+                      <div className="pt-2 border-t border-border/20 mt-2 space-y-1">
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase block">Import from Bestiary</label>
+                        <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto pr-1">
+                          {notes.filter(n => n.category === "bestiary").map(note => (
+                            <button
+                              key={note.id}
+                              type="button"
+                              onClick={() => {
+                                const newC: Combatant = {
+                                  id: `bestiary-${note.id}-${Date.now()}`,
+                                  name: note.title,
+                                  initiative: 10,
+                                  statuses: []
+                                };
+                                setCombatants(prev => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
+                                // Add to recents
+                                setRecentCombatants(prev => {
+                                  const filtered = prev.filter(r => r.name !== note.title);
+                                  return [{ name: note.title, initiative: 10, statuses: [] }, ...filtered].slice(0, 10);
+                                });
+                                toast.success(`Imported ${note.title} from Bestiary!`);
+                              }}
+                              className="text-[9px] border border-border/60 bg-background/50 hover:border-primary/50 hover:bg-accent/40 px-2 py-1 rounded transition-all flex items-center gap-1 text-foreground"
+                            >
+                              🐉 {note.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Manual Creation Form */}
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const form = e.currentTarget;
+                      const name = (form.elements.namedItem("cName") as HTMLInputElement).value.trim();
+                      const init = parseInt((form.elements.namedItem("cInit") as HTMLInputElement).value) || 0;
+                      if (!name) return;
+
+                      const newC: Combatant = {
+                        id: `manual-${Date.now()}`,
+                        name,
+                        initiative: init,
+                        statuses: []
+                      };
+                      setCombatants(prev => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
+                      setRecentCombatants(prev => {
+                        const filtered = prev.filter(r => r.name !== name);
+                        return [{ name, initiative: init, statuses: [] }, ...filtered].slice(0, 10);
+                      });
+                      form.reset();
+                      toast.success(`Added ${name} to combat.`);
+                    }}
+                    className="space-y-3 pt-3 border-t border-border/20 text-xs"
+                  >
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-0.5">Manual Entry</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <Input name="cName" required placeholder="Name / Creature" className="bg-background h-8 text-xs rounded" />
+                      </div>
+                      <div>
+                        <Input name="cInit" type="number" placeholder="Init" className="bg-background h-8 text-xs rounded text-center font-mono" />
+                      </div>
+                    </div>
+                    <Button type="submit" size="sm" className="w-full bg-primary text-primary-foreground font-serif rounded h-8 text-xs">
+                      + Add Combatant
+                    </Button>
+                  </form>
+                </Card>
+
+                {/* Recents Section */}
+                {recentCombatants.length > 0 && (
+                  <Card className="bg-card border-border/50 rounded-md p-4 space-y-2 shadow-sm">
+                    <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/20 pb-1 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-primary" /> Recent Combatants
+                    </h5>
+                    <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto">
+                      {recentCombatants.map((recent, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            const newC: Combatant = {
+                              id: `recent-${idx}-${Date.now()}`,
+                              name: recent.name,
+                              initiative: recent.initiative,
+                              statuses: []
+                            };
+                            setCombatants(prev => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
+                            toast.success(`Added ${recent.name} from recents.`);
+                          }}
+                          className="text-[9px] border border-border/60 bg-background/50 hover:border-primary/50 px-2 py-1 rounded transition-all text-foreground"
+                        >
+                          {recent.name} ({recent.initiative})
+                        </button>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </div>
+
+              {/* Combat Timeline Column (2/3 width) */}
+              <div className="lg:col-span-2 space-y-4">
+                {combatants.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {combatants.map((c, idx) => {
+                      const isActive = idx === currentTurnIdx;
+                      
+                      const moveUp = (i: number) => {
+                        if (i === 0) return;
+                        setCombatants(prev => {
+                          const copy = [...prev];
+                          const temp = copy[i];
+                          copy[i] = copy[i - 1];
+                          copy[i - 1] = temp;
+                          return copy;
+                        });
+                      };
+
+                      const moveDown = (i: number) => {
+                        if (i === combatants.length - 1) return;
+                        setCombatants(prev => {
+                          const copy = [...prev];
+                          const temp = copy[i];
+                          copy[i] = copy[i + 1];
+                          copy[i + 1] = temp;
+                          return copy;
+                        });
+                      };
+
+                      const handleDragStart = (e: React.DragEvent) => {
+                        e.dataTransfer.setData("text/plain", idx.toString());
+                      };
+
+                      const handleDrop = (e: React.DragEvent) => {
+                        const fromIdx = Number(e.dataTransfer.getData("text/plain"));
+                        if (fromIdx !== idx) {
+                          setCombatants(prev => {
+                            const copy = [...prev];
+                            const item = copy.splice(fromIdx, 1)[0];
+                            copy.splice(idx, 0, item);
+                            return copy;
+                          });
+                        }
+                      };
+
+                      return (
+                        <Card 
+                          key={c.id}
+                          draggable
+                          onDragStart={handleDragStart}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={handleDrop}
+                          className={`bg-card border transition-all rounded-md overflow-hidden relative group cursor-grab active:cursor-grabbing ${
+                            isActive 
+                              ? "border-emerald-500 bg-emerald-500/[0.02] shadow-[0_0_12px_rgba(16,185,129,0.1)]" 
+                              : "border-border/40 hover:border-primary/20"
+                          }`}
+                        >
+                          {isActive && (
+                            <div className="absolute left-0 inset-y-0 w-1 bg-emerald-500" />
+                          )}
+                          <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              {/* Turn indicator / index */}
+                              <span className={`text-[10px] font-mono font-bold w-5 h-5 flex items-center justify-center rounded-full ${
+                                isActive ? "bg-emerald-500 text-black" : "bg-muted text-muted-foreground"
+                              }`}>
+                                {idx + 1}
+                              </span>
+
+                              {/* Drag Handle Icon for Desktop */}
+                              <div className="hidden sm:flex flex-col gap-0.5 cursor-grab">
+                                <span className="w-3.5 h-0.5 bg-muted-foreground/30" />
+                                <span className="w-3.5 h-0.5 bg-muted-foreground/30" />
+                                <span className="w-3.5 h-0.5 bg-muted-foreground/30" />
+                              </div>
+
+                              <div className="min-w-0">
+                                <h5 className={`font-serif text-base font-bold ${isActive ? "text-emerald-400" : "text-foreground"}`}>
+                                  {c.name}
+                                </h5>
+                                
+                                {/* Statuses row */}
+                                <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                  {c.statuses.map((status, sIdx) => (
+                                    <Badge 
+                                      key={sIdx} 
+                                      variant="secondary" 
+                                      onClick={() => {
+                                        setCombatants(prev => prev.map(p => p.id === c.id ? { ...p, statuses: p.statuses.filter((_, i) => i !== sIdx) } : p));
+                                        toast.success(`Removed status ${status}`);
+                                      }}
+                                      className="text-[9px] bg-destructive/10 text-destructive-foreground hover:bg-destructive/20 border-0 rounded cursor-pointer select-none flex items-center gap-1 font-semibold"
+                                    >
+                                      {status} <span className="text-[8px] opacity-60">&times;</span>
+                                    </Badge>
+                                  ))}
+                                  
+                                  {/* Add status form trigger */}
+                                  <form 
+                                    onSubmit={(e) => {
+                                      e.preventDefault();
+                                      const input = e.currentTarget.elements.namedItem("newStatus") as HTMLInputElement;
+                                      const val = input.value.trim();
+                                      if (val) {
+                                        setCombatants(prev => prev.map(p => p.id === c.id ? { ...p, statuses: [...p.statuses, val] } : p));
+                                        input.value = "";
+                                        toast.success(`Added status ${val} to ${c.name}`);
+                                      }
+                                    }}
+                                    className="inline-flex items-center"
+                                  >
+                                    <Input
+                                      name="newStatus"
+                                      placeholder="+ status"
+                                      className="h-5 text-[9px] w-14 bg-background/50 border-border/40 px-1 py-0.5 rounded font-medium focus-visible:w-20 transition-all focus-visible:outline-none"
+                                    />
+                                  </form>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Initiative & Controls */}
+                            <div className="flex items-center gap-4 flex-shrink-0">
+                              <div className="text-right">
+                                <div className="text-sm font-bold font-mono text-foreground leading-none">{c.initiative}</div>
+                                <span className="text-[8px] uppercase tracking-wider text-muted-foreground font-semibold">Initiative</span>
+                              </div>
+
+                              {/* Mobile-friendly Up/Down sorting arrows */}
+                              <div className="flex flex-col gap-0.5">
+                                <button 
+                                  onClick={() => moveUp(idx)} 
+                                  disabled={idx === 0}
+                                  className="p-0.5 bg-accent hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed rounded cursor-pointer"
+                                >
+                                  <svg className="w-3 h-3 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" /></svg>
+                                </button>
+                                <button 
+                                  onClick={() => moveDown(idx)} 
+                                  disabled={idx === combatants.length - 1}
+                                  className="p-0.5 bg-accent hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed rounded cursor-pointer"
+                                >
+                                  <svg className="w-3 h-3 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                              </div>
+
+                              {/* Remove button */}
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => {
+                                  setCombatants(prev => prev.filter(p => p.id !== c.id));
+                                  toast.success(`Removed ${c.name} from combat.`);
+                                }}
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded cursor-pointer"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-16 bg-card/30 border border-dashed border-border/40 rounded-md text-sm text-muted-foreground/60 italic font-serif">
+                    No active combatants in timeline. Click Quick Import above or type a manual entry to start combat!
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Styled Delete Warning Dialog */}
@@ -3093,6 +4040,105 @@ export default function CharacterSheet() {
               Delete
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Familiar Release Confirmation Dialog 1 */}
+      <Dialog open={isReleaseConfirmOpen} onOpenChange={setIsReleaseConfirmOpen}>
+        <DialogContent className="sm:max-w-[420px] bg-card border border-border shadow-2xl rounded-md p-6">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl text-destructive font-bold flex items-center gap-2">
+              <Trash2 className="w-5 h-5" /> Release Familiar?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-3 text-xs text-muted-foreground leading-relaxed">
+            Are you sure you want to release this familiar from your service?
+          </div>
+          <div className="flex justify-end gap-3 pt-3 border-t border-border/30">
+            <Button variant="ghost" size="sm" onClick={() => { setIsReleaseConfirmOpen(false); setReleasingFamId(null); }} className="rounded-md font-bold">
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleConfirmFirstRelease} className="rounded-md font-bold">
+              Yes, Release
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Familiar Release Confirmation Dialog 2 */}
+      <Dialog open={isReleaseDoubleConfirmOpen} onOpenChange={setIsReleaseDoubleConfirmOpen}>
+        <DialogContent className="sm:max-w-[420px] bg-card border border-border shadow-2xl rounded-md p-6">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl text-destructive font-bold flex items-center gap-2">
+              <Shield className="w-5 h-5 text-destructive" /> Permanent Release Confirmation
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-3 text-xs text-muted-foreground leading-relaxed">
+            Releasing this familiar is permanent and <strong className="text-foreground">cannot be undone</strong>. Are you absolutely certain you want to proceed?
+          </div>
+          <div className="flex justify-end gap-3 pt-3 border-t border-border/30">
+            <Button variant="ghost" size="sm" onClick={() => { setIsReleaseDoubleConfirmOpen(false); setReleasingFamId(null); }} className="rounded-md font-bold">
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleConfirmSecondRelease} className="rounded-md font-bold">
+              Yes, Permanently Release
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discard Slider Dialog */}
+      <Dialog open={isDiscardOpen} onOpenChange={setIsDiscardOpen}>
+        <DialogContent className="sm:max-w-[420px] bg-card border border-border shadow-2xl rounded-md p-6">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl text-primary font-bold flex items-center gap-2">
+              <Trash2 className="w-5 h-5" /> Discard {discardItem?.name}?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-3 space-y-4 text-xs">
+            <p className="text-muted-foreground leading-relaxed">
+              How many of <strong className="text-foreground">{discardItem?.name}</strong> would you like to discard? (Current quantity: <span className="font-mono text-foreground font-bold">{discardItem?.quantity}</span>)
+            </p>
+            {discardItem && discardItem.quantity > 1 && (
+              <div className="space-y-2">
+                <div className="flex justify-between font-mono text-[10px] text-muted-foreground">
+                  <span>1</span>
+                  <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-0.5 rounded">{discardCount}</span>
+                  <span>{discardItem.quantity}</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max={discardItem.quantity}
+                  value={discardCount}
+                  onChange={(e) => setDiscardCount(Number(e.target.value))}
+                  className="w-full accent-primary bg-background border border-border/60 rounded h-2 cursor-pointer"
+                />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-between items-center pt-3 border-t border-border/30 gap-3">
+            <Button variant="destructive" size="sm" onClick={handleDiscardAll} className="rounded-md font-bold">
+              Discard All Stack
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { setIsDiscardOpen(false); setDiscardItem(null); }} className="rounded-md font-bold">
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleConfirmDiscard} className="rounded-md font-bold bg-primary text-primary-foreground">
+                Discard {discardCount}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox Dialog */}
+      <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
+        <DialogContent className="max-w-4xl bg-black/95 border-none p-0 flex items-center justify-center overflow-hidden">
+          {lightboxImage && (
+            <img src={lightboxImage} className="max-h-[85vh] max-w-full object-contain" alt="Lightbox Preview" />
+          )}
         </DialogContent>
       </Dialog>
 

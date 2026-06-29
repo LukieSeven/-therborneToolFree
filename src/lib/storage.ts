@@ -44,6 +44,7 @@ export interface Familiar {
   abilities: FamiliarAbility[];
   resistances?: string;
   immunities?: string;
+  avatar?: string;
 }
 
 export interface Character {
@@ -84,6 +85,7 @@ export interface Character {
   familiars?: Familiar[];
   resistances?: string;
   immunities?: string;
+  avatar?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -134,9 +136,10 @@ export interface Ability {
   range: string;
   speed: string;
   rollFormula: string;
-  linkedStat: string;
+  linkedStats: string[];
   assignedToQuickRolls: boolean;
   level?: number;
+  active?: boolean;
   bonusPower?: number;
   bonusVitality?: number;
   bonusSpirit?: number;
@@ -145,9 +148,12 @@ export interface Ability {
   bonusPrecision?: number;
   bonusWillpower?: number;
   bonusCharisma?: number;
-  bonusHp?: number;
-  bonusMana?: number;
-  bonusDt?: number;
+  bonusHp?: string | number;
+  bonusMana?: string | number;
+  bonusDt?: string | number;
+  essenceId?: number | null;
+  resistances?: string;
+  immunities?: string;
 }
 
 export interface Skill {
@@ -176,8 +182,9 @@ export interface Note {
   characterId: number;
   title: string;
   content: string;
-  category: string; // 'general', 'location', 'npc', 'item', 'lore'
+  category: string; // 'general', 'location', 'npc', 'item', 'lore', 'bestiary'
   tags: string[];
+  images?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -195,13 +202,33 @@ export function evaluateFormula(formula: string, variables: Record<string, numbe
   try {
     let expression = formula.replace(/\s+/g, "").toLowerCase();
 
+    // 1. If formula contains '=', strip any description on the left-hand side
+    if (expression.includes("=")) {
+      expression = expression.split("=").pop() || expression;
+    }
+
+    // 2. Replace multiplication symbols '×' and 'x' with standard asterisk '*'
+    expression = expression.replace(/×/g, "*").replace(/x/g, "*");
+
     // Substitute variables, sorting descending by length to prevent partial matches
     const sortedKeys = Object.keys(variables).sort((a, b) => b.length - a.length);
+
+    // First substitute rolled suffix versions (e.g. wilr -> 12) with base stat value
+    for (const key of sortedKeys) {
+      const val = variables[key];
+      const escapedKey = key.toLowerCase();
+      expression = expression.split(`${escapedKey}r`).join(String(val));
+    }
+
+    // Then substitute standard base stat keys (e.g. wil -> 12)
     for (const key of sortedKeys) {
       const val = variables[key];
       const escapedKey = key.toLowerCase();
       expression = expression.split(escapedKey).join(String(val));
     }
+
+    // 3. For static pool/recalculation formulas, replace standard dice (e.g. d6, d8) with their maximum value
+    expression = expression.replace(/d(\d+)/g, "$1");
 
     // Security: Only allow mathematical operators, parentheses, digits, and decimals
     if (!/^[0-9+\-*/().]+$/.test(expression)) {
@@ -286,6 +313,9 @@ export function getAdjustedStats(char: Character, equipment: Equipment[], abilit
   maxHp: number;
   maxMana: number;
   maxDt: number;
+  abilityHpBonus: number;
+  abilityManaBonus: number;
+  abilityDtBonus: number;
 } {
   // Sum equipped modifiers
   const equippedList = equipment.filter(e => e.characterId === char.id && e.equipped);
@@ -313,8 +343,9 @@ export function getAdjustedStats(char: Character, equipment: Equipment[], abilit
     }
   }
 
-  // Add ability stat bonuses
-  for (const ability of abilities) {
+  // Add active ability stat bonuses
+  const activeAbilities = abilities.filter(a => a.active === true);
+  for (const ability of activeAbilities) {
     if (ability.bonusPower) stats.power += ability.bonusPower;
     if (ability.bonusVitality) stats.vitality += ability.bonusVitality;
     if (ability.bonusSpirit) stats.spirit += ability.bonusSpirit;
@@ -340,11 +371,6 @@ export function getAdjustedStats(char: Character, equipment: Equipment[], abilit
   // Calculate equipped armor DT bonus
   const armorDtBonus = equippedList.reduce((sum, item) => sum + (item.dtBonus || 0), 0);
 
-  // Sum ability resource bonuses
-  const abilityHpBonus = abilities.reduce((sum, ab) => sum + (ab.bonusHp || 0), 0);
-  const abilityManaBonus = abilities.reduce((sum, ab) => sum + (ab.bonusMana || 0), 0);
-  const abilityDtBonus = abilities.reduce((sum, ab) => sum + (ab.bonusDt || 0), 0);
-
   // Compute derived maximums using variables
   const variables: Record<string, number> = {
     power: stats.power,
@@ -363,11 +389,30 @@ export function getAdjustedStats(char: Character, equipment: Equipment[], abilit
     wil: stats.willpower,
     charisma: stats.charisma,
     cha: stats.charisma,
-    dtbonus: char.dtBonus + armorDtBonus + abilityDtBonus,
+    dtbonus: char.dtBonus + armorDtBonus,
   };
 
-  const maxHp = evaluateFormula(char.hpFormula || "Vitality * 10 + Endurance * 5", variables) + abilityHpBonus;
-  const maxMana = evaluateFormula(char.manaFormula || "Spirit * 10 + Willpower * 5", variables) + abilityManaBonus;
+  // Sum active ability resource bonuses using evaluateFormula dynamically
+  const abilityHpBonus = activeAbilities.reduce((sum, ab) => {
+    if (!ab.bonusHp) return sum;
+    const evaluated = typeof ab.bonusHp === "number" ? ab.bonusHp : evaluateFormula(String(ab.bonusHp), variables);
+    return sum + evaluated;
+  }, 0);
+
+  const abilityManaBonus = activeAbilities.reduce((sum, ab) => {
+    if (!ab.bonusMana) return sum;
+    const evaluated = typeof ab.bonusMana === "number" ? ab.bonusMana : evaluateFormula(String(ab.bonusMana), variables);
+    return sum + evaluated;
+  }, 0);
+
+  const abilityDtBonus = activeAbilities.reduce((sum, ab) => {
+    if (!ab.bonusDt) return sum;
+    const evaluated = typeof ab.bonusDt === "number" ? ab.bonusDt : evaluateFormula(String(ab.bonusDt), variables);
+    return sum + evaluated;
+  }, 0);
+
+  const maxHp = evaluateFormula(char.hpFormula || "Vitality * 10 + Endurance * 5", variables);
+  const maxMana = evaluateFormula(char.manaFormula || "Spirit * 10 + Willpower * 5", variables);
   const maxDt = evaluateFormula(char.dtFormula || "Endurance * 2 + dtBonus", variables);
 
   return {
@@ -377,6 +422,9 @@ export function getAdjustedStats(char: Character, equipment: Equipment[], abilit
     maxHp: Math.max(1, maxHp),
     maxMana: Math.max(0, maxMana),
     maxDt: Math.max(0, maxDt),
+    abilityHpBonus,
+    abilityManaBonus,
+    abilityDtBonus,
   };
 }
 
@@ -460,6 +508,34 @@ export const storage = {
     };
     chars.push(character);
     setList(KEYS.characters, chars);
+
+    // Auto-seed base campaign lore notes (places, characters, factions, bestiary)
+    const list = getList<Note>(KEYS.notes);
+    let noteId = list.length > 0 ? Math.max(...list.map(n => n.id)) + 1 : 1;
+    const BASE_CAMPAIGN_NOTES = [
+      { title: "Faction: The Wardens of AEther", content: "An elite order of knights and magi sworn to defend civilization against the corruption of the deep rift.", category: "lore", tags: ["factions", "wardens"] },
+      { title: "Faction: The Riftstriders", content: "A loose syndicate of smugglers, explorers, and rogue scholars who venture deep into the rift to seek ancient relics.", category: "lore", tags: ["factions", "riftstriders"] },
+      { title: "Aria, the Campfire Keeper", content: "A mysterious warden who tends the AEther flames. She speaks in riddles but offers guidance to travelers.", category: "npc", tags: ["keeper", "campfire"] },
+      { title: "Commander Vane", content: "Leader of the Citadel Wardens. A battle-scarred veteran who distrusts magic but values survival.", category: "npc", tags: ["wardens", "citadel"] },
+      { title: "The Campfire", content: "The safe haven of adventurers. A magical flame that wards off the shadows of the outer wilds.", category: "location", tags: ["safehaven", "campfire"] },
+      { title: "AEtherpoint Citadel", content: "The last bastion of civilization. Built on the edge of the great rift, powered by condensed AEther crystals.", category: "location", tags: ["city", "citadel"] },
+      { title: "The AEther Corruption", content: "A dark energy that leaks from the rift. It warps living creatures and twists thoughts, driving the weak-willed to madness.", category: "lore", tags: ["corruption", "rift"] },
+      { title: "The Legend of AEtherborne", content: "Those born with the unique capability to channel AEther energy without succumbing to corruption are known as AEtherborne.", category: "lore", tags: ["legends", "aetherborne"] },
+      { title: "Rift Wolf", content: "Pack hunters that roam the outer rims of the great rift. Their bodies glow with unstable AEther energy.", category: "bestiary", tags: ["beast", "monster", "wolf"] },
+      { title: "AEther Stalker", content: "Insubstantial monstrosities that hide in shadows and feed on raw magic and psychic essence.", category: "bestiary", tags: ["beast", "monster", "stalker"] }
+    ];
+    BASE_CAMPAIGN_NOTES.forEach(note => {
+      list.push({
+        ...note,
+        id: noteId++,
+        characterId: newId,
+        images: [],
+        createdAt: now,
+        updatedAt: now
+      });
+    });
+    setList(KEYS.notes, list);
+
     return character;
   },
 
@@ -781,7 +857,7 @@ const DEFAULT_CHARACTER: Omit<Character, "id" | "name"> = {
   precisionTraining: 0,
   willpowerTraining: 0,
   charismaTraining: 0,
-  favorites: Array(10).fill(null),
+  favorites: Array(20).fill(null),
   familiars: [],
   resistances: "",
   immunities: "",
@@ -845,9 +921,10 @@ const DEFAULT_ABILITY: Omit<Ability, "id" | "characterId" | "name"> = {
   range: "Self",
   speed: "Instant",
   rollFormula: "",
-  linkedStat: "spirit",
+  linkedStats: [],
   assignedToQuickRolls: false,
   level: 1,
+  active: false,
   bonusPower: 0,
   bonusVitality: 0,
   bonusSpirit: 0,
@@ -856,9 +933,12 @@ const DEFAULT_ABILITY: Omit<Ability, "id" | "characterId" | "name"> = {
   bonusPrecision: 0,
   bonusWillpower: 0,
   bonusCharisma: 0,
-  bonusHp: 0,
-  bonusMana: 0,
-  bonusDt: 0
+  bonusHp: "",
+  bonusMana: "",
+  bonusDt: "",
+  essenceId: null,
+  resistances: "",
+  immunities: ""
 };
 
 const DEFAULT_SKILL: Omit<Skill, "id" | "characterId" | "name"> = {
@@ -870,7 +950,8 @@ const DEFAULT_NOTE: Omit<Note, "id" | "characterId" | "createdAt" | "updatedAt">
   title: "Untitled Note",
   content: "",
   category: "general",
-  tags: []
+  tags: [],
+  images: []
 };
 
 export function exportCharacterJSON(charId: number): void {
@@ -992,14 +1073,19 @@ export function importCharacterJSON(jsonString: string): Character {
     setList(KEYS.inventory, list);
   }
 
+  const essenceIdMap: Record<number, number> = {};
   if (Array.isArray(data.essences)) {
     const list = getList<Essence>(KEYS.essences);
     let nextId = list.length > 0 ? Math.max(...list.map(e => e.id)) + 1 : 1;
     data.essences.forEach((item: any) => {
+      const newId = nextId++;
+      if (item.id) {
+        essenceIdMap[item.id] = newId;
+      }
       list.push({
         ...DEFAULT_ESSENCE,
         ...item,
-        id: nextId++,
+        id: newId,
         characterId: nextCharId
       });
     });
@@ -1010,11 +1096,24 @@ export function importCharacterJSON(jsonString: string): Character {
     const list = getList<Ability>(KEYS.abilities);
     let nextId = list.length > 0 ? Math.max(...list.map(a => a.id)) + 1 : 1;
     data.abilities.forEach((item: any) => {
+      const oldEssId = item.essenceId;
+      const newEssId = oldEssId && essenceIdMap[oldEssId] ? essenceIdMap[oldEssId] : null;
+
+      // Handle legacy linkedStat rekeying defensively
+      let mappedStats = item.linkedStats;
+      if (!mappedStats && item.linkedStat) {
+        mappedStats = [item.linkedStat];
+      } else if (!mappedStats) {
+        mappedStats = [];
+      }
+
       list.push({
         ...DEFAULT_ABILITY,
         ...item,
         id: nextId++,
-        characterId: nextCharId
+        characterId: nextCharId,
+        essenceId: newEssId,
+        linkedStats: mappedStats
       });
     });
     setList(KEYS.abilities, list);

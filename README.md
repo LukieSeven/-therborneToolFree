@@ -1,25 +1,24 @@
-# AEtherborne RPG Tool
+# The Grimoire
 
-[![Open in CodeSandbox](https://img.shields.io/badge/Open%20in-CodeSandbox-blue?style=for-the-badge&logo=codesandbox)](https://codesandbox.io/s/github/LukieSeven/AetherborneTool/tree/main)
+[![Deploy to GitHub Pages](https://img.shields.io/badge/Deploy%20to-GitHub%20Pages-green?style=for-the-badge&logo=github)](https://lukieseven.github.io/The-Grimoire/)
 
-A standalone, client-side digital character sheet and campaign journal built specifically for the **AEtherborne RPG** system. Designed to be run natively in any web browser without server setup.
+A standalone, client-side digital spellbook, combat tracker, and campaign manager. Designed to be run natively in any web browser or hosted via GitHub Pages without server-side setup.
 
 ---
 
-## ⚡ Live Demo (CodeSandbox)
+## ⚡ Live Demo (GitHub Pages)
 
-Click the **"Open in CodeSandbox"** badge above to launch the application instantly in your browser. CodeSandbox will build and run the development server automatically.
+👉 **[Launch The Grimoire](https://lukieseven.github.io/The-Grimoire/)**
 
 ---
 
 ## 🛡️ Core Features
 
-* **Browser LocalStorage Database**: Saves all your characters, stats, items, equipment, currencies, essences, abilities, and logs directly in your browser.
-* **JSON Character Backup System**: Export your character sheet as a `.json` backup file or import existing sheets to share between players and devices.
-* **Derived Math Formula Evaluation**: Custom mathematical expressions automatically compute derived stats (like HP, Mana, and DT) based on your attributes and gear.
-* **HUD Resource Controls**: Manage HP, Mana, and DT with Add (+), Remove (-), and Buff controls. Buffs exceed maximum capacities and glow in gold highlights.
-* **Attacks & Quick Actions Bar**: Equip weapons or assign abilities to your HUD to trigger quick dice rolls and automatically deduct Mana costs.
-* **Crit Chain Dice Roller**: Explodes maximum rolls, tracking multipliers and crit tiers (Common, Rare, Epic, Legendary, etc.) dynamically.
+* **Combat Tracker Tab:** A DM/player initiative tracker with active turn indicators, custom status tags (Stunned, Poisoned), and drag-and-drop/arrows reordering.
+* **Base64 Compressed Portrait Uploads:** Add portraits to characters, familiars, and attach multiple images to campaign notes.
+* **Browser LocalStorage Database**: Saves all characters, combat states, items, equipment, and campaign notes directly in your browser.
+* **JSON Backup System**: Export your character sheets and campaign notes as backups or import existing JSON logs.
+* **Recent Actions & Quick Hotbars:** Trigger rolls with a 20-slot expanded hotbar and instantly re-roll from the "Recent Actions" history panel.
 
 ---
 

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useListAbilities, useAddAbility, useUpdateAbility, useDeleteAbility } from "@/hooks/useStorage";
+import { useListAbilities, useAddAbility, useUpdateAbility, useDeleteAbility, useListEssences } from "@/hooks/useStorage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Edit2, ShieldAlert } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "react-hot-toast";
 
 interface Props {
   characterId: number;
@@ -16,6 +17,7 @@ const STAT_OPTIONS = ["power", "vitality", "spirit", "agility", "endurance", "pr
 export function EditAbilitiesDialog({ characterId }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const { data: abilities } = useListAbilities(characterId);
+  const { data: essences } = useListEssences(characterId);
   const addAbility = useAddAbility();
   const updateAbility = useUpdateAbility();
   const deleteAbility = useDeleteAbility();
@@ -32,8 +34,11 @@ export function EditAbilitiesDialog({ characterId }: Props) {
   const [range, setRange] = useState("");
   const [speed, setSpeed] = useState("");
   const [rollFormula, setRollFormula] = useState("");
-  const [linkedStat, setLinkedStat] = useState("power");
+  const [linkedStats, setLinkedStats] = useState<string[]>([]);
   const [assignedToQuickRolls, setAssignedToQuickRolls] = useState(false);
+  const [essenceId, setEssenceId] = useState<number | null>(null);
+  const [resistances, setResistances] = useState("");
+  const [immunities, setImmunities] = useState("");
 
   // Bonus states
   const [bonusPower, setBonusPower] = useState<number>(0);
@@ -44,9 +49,9 @@ export function EditAbilitiesDialog({ characterId }: Props) {
   const [bonusPrecision, setBonusPrecision] = useState<number>(0);
   const [bonusWillpower, setBonusWillpower] = useState<number>(0);
   const [bonusCharisma, setBonusCharisma] = useState<number>(0);
-  const [bonusHp, setBonusHp] = useState<number>(0);
-  const [bonusMana, setBonusMana] = useState<number>(0);
-  const [bonusDt, setBonusDt] = useState<number>(0);
+  const [bonusHp, setBonusHp] = useState<string>("");
+  const [bonusMana, setBonusMana] = useState<string>("");
+  const [bonusDt, setBonusDt] = useState<string>("");
 
   const resetForm = () => {
     setName("");
@@ -56,8 +61,11 @@ export function EditAbilitiesDialog({ characterId }: Props) {
     setRange("");
     setSpeed("");
     setRollFormula("");
-    setLinkedStat("power");
+    setLinkedStats([]);
     setAssignedToQuickRolls(false);
+    setEssenceId(null);
+    setResistances("");
+    setImmunities("");
     setBonusPower(0);
     setBonusVitality(0);
     setBonusSpirit(0);
@@ -66,9 +74,9 @@ export function EditAbilitiesDialog({ characterId }: Props) {
     setBonusPrecision(0);
     setBonusWillpower(0);
     setBonusCharisma(0);
-    setBonusHp(0);
-    setBonusMana(0);
-    setBonusDt(0);
+    setBonusHp("");
+    setBonusMana("");
+    setBonusDt("");
     setEditingId(null);
   };
 
@@ -86,8 +94,11 @@ export function EditAbilitiesDialog({ characterId }: Props) {
     setRange(ability.range);
     setSpeed(ability.speed);
     setRollFormula(ability.rollFormula);
-    setLinkedStat(ability.linkedStat);
+    setLinkedStats(ability.linkedStats || (ability.linkedStat ? [ability.linkedStat] : []));
     setAssignedToQuickRolls(ability.assignedToQuickRolls);
+    setEssenceId(ability.essenceId || null);
+    setResistances(ability.resistances || "");
+    setImmunities(ability.immunities || "");
     setBonusPower(ability.bonusPower || 0);
     setBonusVitality(ability.bonusVitality || 0);
     setBonusSpirit(ability.bonusSpirit || 0);
@@ -96,9 +107,9 @@ export function EditAbilitiesDialog({ characterId }: Props) {
     setBonusPrecision(ability.bonusPrecision || 0);
     setBonusWillpower(ability.bonusWillpower || 0);
     setBonusCharisma(ability.bonusCharisma || 0);
-    setBonusHp(ability.bonusHp || 0);
-    setBonusMana(ability.bonusMana || 0);
-    setBonusDt(ability.bonusDt || 0);
+    setBonusHp(ability.bonusHp !== undefined ? String(ability.bonusHp) : "");
+    setBonusMana(ability.bonusMana !== undefined ? String(ability.bonusMana) : "");
+    setBonusDt(ability.bonusDt !== undefined ? String(ability.bonusDt) : "");
     setMode("edit");
   };
 
@@ -106,57 +117,50 @@ export function EditAbilitiesDialog({ characterId }: Props) {
     e.preventDefault();
     if (!name.trim()) return;
 
+    // Validate 5-ability cap per Essence
+    if (essenceId !== null) {
+      const activeEssenceAbilities = abilities?.filter(a => a.essenceId === essenceId && a.id !== editingId) || [];
+      if (activeEssenceAbilities.length >= 5) {
+        toast.error("This Essence already has the maximum of 5 shaped abilities. Reassign or delete one first.");
+        return;
+      }
+    }
+
+    const payload = {
+      characterId,
+      name,
+      description,
+      cost,
+      cooldown,
+      range,
+      speed,
+      rollFormula,
+      linkedStats,
+      assignedToQuickRolls,
+      essenceId,
+      resistances,
+      immunities,
+      bonusPower,
+      bonusVitality,
+      bonusSpirit,
+      bonusAgility,
+      bonusEndurance,
+      bonusPrecision,
+      bonusWillpower,
+      bonusCharisma,
+      bonusHp,
+      bonusMana,
+      bonusDt,
+    };
+
     if (mode === "add") {
-      addAbility.mutate({
-        characterId,
-        name,
-        description,
-        cost,
-        cooldown,
-        range,
-        speed,
-        rollFormula,
-        linkedStat,
-        assignedToQuickRolls,
-        bonusPower,
-        bonusVitality,
-        bonusSpirit,
-        bonusAgility,
-        bonusEndurance,
-        bonusPrecision,
-        bonusWillpower,
-        bonusCharisma,
-        bonusHp,
-        bonusMana,
-        bonusDt,
-      }, {
+      addAbility.mutate(payload, {
         onSuccess: () => setMode("list"),
       });
     } else if (mode === "edit" && editingId) {
       updateAbility.mutate({
         id: editingId,
-        data: {
-          name,
-          description,
-          cost,
-          cooldown,
-          range,
-          speed,
-          rollFormula,
-          linkedStat,
-          assignedToQuickRolls,
-          bonusPower,
-          bonusVitality,
-          bonusSpirit,
-          bonusAgility,
-          bonusEndurance,
-          bonusPrecision,
-          bonusWillpower,
-          bonusCharisma,
-          bonusHp,
-          bonusMana,
-          bonusDt,
-        },
+        data: payload,
       }, {
         onSuccess: () => setMode("list"),
       });
@@ -232,14 +236,47 @@ export function EditAbilitiesDialog({ characterId }: Props) {
                 <Input value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Fireball, Cleave" className="bg-background" />
               </div>
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Linked Attribute (for Roll modifier)</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Essence Source</label>
                 <select 
-                  value={linkedStat} 
-                  onChange={e => setLinkedStat(e.target.value)} 
+                  value={essenceId === null ? "" : essenceId} 
+                  onChange={e => setEssenceId(e.target.value === "" ? null : Number(e.target.value))} 
                   className="w-full h-9 rounded-md border border-border/60 bg-background px-3 py-1 text-sm shadow-sm transition-colors text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 >
-                  {STAT_OPTIONS.map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+                  <option value="">None (Unassigned)</option>
+                  {essences?.map(ess => (
+                    <option key={ess.id} value={ess.id}>
+                      Slot {ess.slot}: {ess.name || "Unnamed Essence"}
+                    </option>
+                  ))}
                 </select>
+              </div>
+            </div>
+
+            {/* Linked Attributes checkboxes */}
+            <div>
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Linked Attributes (For Roll Modifiers)</label>
+              <div className="grid grid-cols-4 gap-2">
+                {STAT_OPTIONS.map(stat => {
+                  const isChecked = linkedStats.includes(stat);
+                  return (
+                    <div key={stat} className="flex items-center gap-2 bg-background border border-border/40 p-2 rounded-md">
+                      <Checkbox 
+                        id={`link_${stat}`} 
+                        checked={isChecked} 
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setLinkedStats([...linkedStats, stat]);
+                          } else {
+                            setLinkedStats(linkedStats.filter(s => s !== stat));
+                          }
+                        }} 
+                      />
+                      <label htmlFor={`link_${stat}`} className="text-xs font-mono font-bold uppercase cursor-pointer">
+                        {stat.substring(0, 3)}
+                      </label>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -265,7 +302,7 @@ export function EditAbilitiesDialog({ characterId }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Roll Formula (Optional)</label>
-                <Input value={rollFormula} onChange={e => setRollFormula(e.target.value)} placeholder="e.g. 2d6, d8+2" className="bg-background font-mono" />
+                <Input value={rollFormula} onChange={e => setRollFormula(e.target.value)} placeholder="e.g. STATr*3, 2d6, d8+2" className="bg-background font-mono" />
               </div>
               <div className="flex items-center gap-2 pt-6">
                 <Checkbox 
@@ -309,25 +346,51 @@ export function EditAbilitiesDialog({ characterId }: Props) {
               </div>
 
               <div>
-                <h4 className="text-xs font-bold text-primary uppercase tracking-widest mb-2 font-serif">Flat Resource Pool Bonuses</h4>
+                <h4 className="text-xs font-bold text-primary uppercase tracking-widest mb-2 font-serif">Resource Pool Formulas/Bonuses</h4>
                 <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: "Max HP", val: bonusHp, set: setBonusHp },
-                    { label: "Max Mana", val: bonusMana, set: setBonusMana },
-                    { label: "Max DT", val: bonusDt, set: setBonusDt },
-                  ].map(pool => (
-                    <div key={pool.label}>
-                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">{pool.label}</label>
-                      <Input 
-                        type="number" 
-                        value={pool.val === 0 ? "" : pool.val} 
-                        onChange={e => pool.set(e.target.value === "" ? 0 : Number(e.target.value))} 
-                        placeholder="+0"
-                        className="bg-background h-8 font-mono text-xs text-center" 
-                      />
-                    </div>
-                  ))}
+                  <div>
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Max HP</label>
+                    <Input 
+                      type="text" 
+                      value={bonusHp} 
+                      onChange={e => setBonusHp(e.target.value)} 
+                      placeholder="e.g. VIT*5, +10"
+                      className="bg-background h-8 font-mono text-xs text-center" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Max Mana</label>
+                    <Input 
+                      type="text" 
+                      value={bonusMana} 
+                      onChange={e => setBonusMana(e.target.value)} 
+                      placeholder="e.g. SPI*5, +10"
+                      className="bg-background h-8 font-mono text-xs text-center" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Max DT</label>
+                    <Input 
+                      type="text" 
+                      value={bonusDt} 
+                      onChange={e => setBonusDt(e.target.value)} 
+                      placeholder="e.g. WIL*2, +2"
+                      className="bg-background h-8 font-mono text-xs text-center" 
+                    />
+                  </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Resistances & Immunities */}
+            <div className="grid grid-cols-2 gap-4 border-t border-border/30 pt-4">
+              <div>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Resistances Granted</label>
+                <Input value={resistances} onChange={e => setResistances(e.target.value)} placeholder="e.g. Fire, Pierce" className="bg-background" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Immunities Granted</label>
+                <Input value={immunities} onChange={e => setImmunities(e.target.value)} placeholder="e.g. Poison, Stun" className="bg-background" />
               </div>
             </div>
 

@@ -525,11 +525,29 @@ export function useCreateRoll() {
       if (!char) throw new Error("Character not found");
 
       let rollingEntity: any = char;
+      let finalStats: Record<string, number> = {};
+
       if (familiarId !== undefined) {
         const fam = char.familiars?.find(f => f.id === familiarId);
         if (fam) {
           rollingEntity = fam;
+          finalStats = {
+            power: fam.power,
+            vitality: fam.vitality,
+            spirit: fam.spirit,
+            agility: fam.agility,
+            endurance: fam.endurance,
+            precision: fam.precision,
+            willpower: fam.willpower,
+            charisma: fam.charisma
+          };
         }
+      } else {
+        const equipment = storage.getEquipment(charId);
+        const abilities = storage.getAbilities(charId);
+        const adjusted = getAdjustedStats(char, equipment, abilities);
+        rollingEntity = char;
+        finalStats = adjusted.stats;
       }
 
       function dieForValue(v: number): number {
@@ -576,6 +594,15 @@ export function useCreateRoll() {
       if (statValue === undefined && (hasStatPrefix || hasOperators)) {
         // Advanced Math/Stat-Based formula parser
         let expression = diceType.replace(/\s+/g, "").toLowerCase();
+
+        // 1. If formula contains '=', strip any description on the left-hand side
+        if (expression.includes("=")) {
+          expression = expression.split("=").pop() || expression;
+        }
+
+        // 2. Replace multiplication symbols '×' and 'x' with standard asterisk '*'
+        expression = expression.replace(/×/g, "*").replace(/x/g, "*");
+
         const statsKeys = ["power", "vitality", "spirit", "agility", "endurance", "precision", "willpower", "charisma"];
         const statPrefixes = ["pow", "vit", "spi", "agi", "end", "pre", "wil", "cha"];
         let diceDescriptionParts: string[] = [];
@@ -596,19 +623,46 @@ export function useCreateRoll() {
           return { total: sum, desc, isCrit: crit };
         };
 
-        // A. Resolve stats
+        // A. Resolve rolled stats (e.g., wilr, willpowerr)
         for (let i = 0; i < statPrefixes.length; i++) {
           const prefix = statPrefixes[i];
           const statKey = statsKeys[i];
-          const regex = new RegExp(prefix, "g");
           
-          if (regex.test(expression)) {
-            const statVal = (rollingEntity[statKey] !== undefined ? rollingEntity[statKey] : 10) as number;
+          const rolledFullPattern = `${statKey}r`;
+          const rolledPrefixPattern = `${prefix}r`;
+          
+          const regexFull = new RegExp(rolledFullPattern, "g");
+          const regexPrefix = new RegExp(rolledPrefixPattern, "g");
+          
+          if (regexFull.test(expression) || regexPrefix.test(expression)) {
+            const statVal = (finalStats[statKey] !== undefined ? finalStats[statKey] : 10) as number;
             const { total: rolledSum, desc, isCrit: crit } = rollStatDice(statVal);
             if (crit) isCrit = true;
-            expression = expression.split(prefix).join(String(rolledSum));
-            diceDescriptionParts.push(`${prefix.toUpperCase()}(${desc})`);
-            rollDetailsParts.push(`${prefix.toUpperCase()}:${rolledSum}`);
+            
+            expression = expression.split(rolledFullPattern).join(String(rolledSum));
+            expression = expression.split(rolledPrefixPattern).join(String(rolledSum));
+            
+            diceDescriptionParts.push(`${prefix.toUpperCase()}r(${desc})`);
+            rollDetailsParts.push(`${prefix.toUpperCase()}r:${rolledSum}`);
+          }
+        }
+
+        // B. Resolve base stats (e.g., wil, willpower)
+        for (let i = 0; i < statPrefixes.length; i++) {
+          const prefix = statPrefixes[i];
+          const statKey = statsKeys[i];
+          
+          const regexFull = new RegExp(statKey, "g");
+          const regexPrefix = new RegExp(prefix, "g");
+          
+          if (regexFull.test(expression) || regexPrefix.test(expression)) {
+            const statVal = (finalStats[statKey] !== undefined ? finalStats[statKey] : 10) as number;
+            
+            expression = expression.split(statKey).join(String(statVal));
+            expression = expression.split(prefix).join(String(statVal));
+            
+            diceDescriptionParts.push(`${prefix.toUpperCase()}(${statVal})`);
+            rollDetailsParts.push(`${prefix.toUpperCase()}:${statVal}`);
           }
         }
 

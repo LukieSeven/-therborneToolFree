@@ -9,6 +9,7 @@ import { AlertCircle, Loader2, Plus, Trash2, BookOpen } from "lucide-react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { CustomizeToolDialog } from "@/components/dialogs/customize-tool-dialog";
+import { RollGuideDialog } from "@/components/dialogs/roll-guide-dialog";
 
 export default function Dashboard() {
   const { data: characters, isLoading: loadingChars } = useListCharacters();
@@ -157,16 +158,17 @@ export default function Dashboard() {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border/40 pb-6">
         <div>
           <h1 className="text-5xl font-serif font-extrabold tracking-wider bg-gradient-to-r from-primary via-blue-200 to-primary bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(59,130,246,0.15)] mb-2">
-            AEtherborne RPG Tool
+            The Grimoire
           </h1>
           <p className="text-muted-foreground font-serif italic text-base">
-            Forge and manage your legends of the campfire.
+            Forge your heroes and manage your campaigns.
           </p>
         </div>
 
         {/* Ethereal New Character Dialog Trigger */}
         <div className="flex items-center gap-3">
           <CustomizeToolDialog />
+          <RollGuideDialog />
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90 text-base font-serif font-bold tracking-wide px-6 py-5 rounded-md border border-primary/60 animate-ethereal-pulse shadow-lg transition-transform cursor-pointer">
@@ -340,16 +342,26 @@ export default function Dashboard() {
                   onClick={() => setLocation(`/characters/${char.id}`)}
                   className="w-full text-left rounded-md border border-border/50 bg-card/60 backdrop-blur hover:border-primary/60 transition-colors duration-250 cursor-pointer group"
                 >
-                  <div className="p-5 flex items-start justify-between">
-                    <div>
-                      <h3 className="font-serif text-lg font-bold text-foreground group-hover:text-primary transition-colors">
-                        {char.name}
-                      </h3>
-                      <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
-                        {char.race} · {char.rank}
-                      </p>
+                  <div className="p-5 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      {/* Character Avatar Portrait */}
+                      <div className="w-12 h-12 rounded-full overflow-hidden border border-border/60 bg-background/40 flex-shrink-0 flex items-center justify-center">
+                        {char.avatar ? (
+                          <img src={char.avatar} alt={char.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-muted-foreground text-xs font-bold uppercase">{char.name.substring(0, 2)}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-serif text-lg font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                          {char.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground uppercase tracking-widest mt-0.5 truncate">
+                          {char.race} · {char.rank}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <div className="text-xl font-bold font-mono text-foreground leading-tight">
                         {char.currentHp}<span className="text-xs text-muted-foreground font-normal">/{char.maxHp}</span>
                       </div>
