@@ -3653,49 +3653,6 @@ export default function CharacterSheet() {
               );
             })()}
           </div>
-        )}                   <span className="text-[10px] font-mono text-muted-foreground font-semibold">
-                            Shaped Abilities: {attached.length} / 5
-                          </span>
-                        </div>
-
-                        {attached.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {attached.map(renderAbilityCard)}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground/60 italic font-serif py-2">
-                            No abilities shaped to this Essence. (Max 5)
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Unassigned Group */}
-                  {unassignedAbilities.length > 0 && (
-                    <div className="space-y-3 border-l-2 border-border/20 pl-4 py-1">
-                      <div className="flex justify-between items-baseline border-b border-border/20 pb-1.5">
-                        <h4 className="font-serif text-lg font-bold text-muted-foreground">Unassigned Abilities</h4>
-                        <span className="text-[10px] font-mono text-muted-foreground font-semibold">
-                          Total: {unassignedAbilities.length}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {unassignedAbilities.map(renderAbilityCard)}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Empty State when no abilities exist at all */}
-                  {(!abilities || abilities.length === 0) && (
-                    <div className="text-center py-12 bg-card/30 border border-dashed border-border-border/40 rounded-md text-sm text-muted-foreground/60 italic font-serif">
-                      No abilities registered yet. Click "Edit Abilities" to manage your spellbook.
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
         )}
 
         {/* TAB 6: CAMPAIGN NOTES (Search and Thematic Filter) */}
