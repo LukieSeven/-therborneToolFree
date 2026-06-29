@@ -116,6 +116,22 @@ const getFavorites = (char: any, eq: any[], ab: any[]): (FavoriteSlot | null)[] 
   return slots;
 };
 
+// Crit Chain Die Resolution Helper
+const getChainDie = (formula: string): string => {
+  const parts = formula.split(/[+\-*/()]/).map(p => p.trim()).filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i];
+    const dieMatch = part.match(/d\d+/i);
+    if (dieMatch) {
+      return dieMatch[0].toLowerCase();
+    }
+    if (/^[a-z]+$/i.test(part)) {
+      return part;
+    }
+  }
+  return "d8";
+};
+
 interface Combatant {
   id: string;
   name: string;
@@ -877,7 +893,7 @@ export default function CharacterSheet() {
           setTimeout(() => {
             const rolled = data.result ?? 0;
             const wasCrit = (data as any).isCrit ?? false;
-            const chainDie = diceType.split("+").pop() ?? diceType;
+            const chainDie = getChainDie(diceType);
             const lbl = label || rollLabel || diceType;
             
             setRecentRollActions(prev => {

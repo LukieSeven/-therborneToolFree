@@ -594,6 +594,7 @@ export function useCreateRoll() {
       if (statValue === undefined && (hasStatPrefix || hasOperators)) {
         // Advanced Math/Stat-Based formula parser
         let expression = diceType.replace(/\s+/g, "").toLowerCase();
+        let breakdown = diceType;
 
         // 1. If formula contains '=', strip any description on the left-hand side
         if (expression.includes("=")) {
@@ -605,8 +606,6 @@ export function useCreateRoll() {
 
         const statsKeys = ["power", "vitality", "spirit", "agility", "endurance", "precision", "willpower", "charisma"];
         const statPrefixes = ["pow", "vit", "spi", "agi", "end", "pre", "wil", "cha"];
-        let diceDescriptionParts: string[] = [];
-        let rollDetailsParts: string[] = [];
 
         const rollStatDice = (statVal: number): { total: number; desc: string; isCrit: boolean } => {
           const diceSides = getStatDiceSides(statVal);
@@ -642,8 +641,11 @@ export function useCreateRoll() {
             expression = expression.split(rolledFullPattern).join(String(rolledSum));
             expression = expression.split(rolledPrefixPattern).join(String(rolledSum));
             
-            diceDescriptionParts.push(`${prefix.toUpperCase()}r(${desc})`);
-            rollDetailsParts.push(`${prefix.toUpperCase()}r:${rolledSum}`);
+            const critSuffix = crit ? "!" : "";
+            const regexFullInsensitive = new RegExp(rolledFullPattern, "gi");
+            const regexPrefixInsensitive = new RegExp(rolledPrefixPattern, "gi");
+            breakdown = breakdown.replace(regexFullInsensitive, `${rolledSum}${critSuffix}`);
+            breakdown = breakdown.replace(regexPrefixInsensitive, `${rolledSum}${critSuffix}`);
           }
         }
 
@@ -661,24 +663,28 @@ export function useCreateRoll() {
             expression = expression.split(statKey).join(String(statVal));
             expression = expression.split(prefix).join(String(statVal));
             
-            diceDescriptionParts.push(`${prefix.toUpperCase()}(${statVal})`);
-            rollDetailsParts.push(`${prefix.toUpperCase()}:${statVal}`);
+            const regexFullInsensitive = new RegExp(statKey, "gi");
+            const regexPrefixInsensitive = new RegExp(prefix, "gi");
+            breakdown = breakdown.replace(regexFullInsensitive, String(statVal));
+            breakdown = breakdown.replace(regexPrefixInsensitive, String(statVal));
           }
         }
 
-        // B. Resolve standard dice
-        const diceRegex = /d(\d+)/g;
+        // C. Resolve standard dice
+        const diceRegex = /d(\d+)/gi;
         let match;
         while ((match = diceRegex.exec(expression)) !== null) {
           const sides = parseInt(match[1], 10);
           const r = rollOnce(sides);
           if (r.isCrit) isCrit = true;
-          expression = expression.replace(match[0], String(r.result));
-          diceDescriptionParts.push(`d${sides}(${r.result})`);
-          rollDetailsParts.push(`d${sides}:${r.result}`);
+          
+          const critSuffix = r.isCrit ? "!" : "";
+          const matchStr = match[0];
+          expression = expression.replace(new RegExp(matchStr, "i"), String(r.result));
+          breakdown = breakdown.replace(new RegExp(matchStr, "i"), `${r.result}${critSuffix}`);
         }
 
-        // C. Evaluate expression
+        // D. Evaluate expression
         let evaluated = 0;
         if (/^[0-9+\-*/().]+$/.test(expression)) {
           try {
@@ -689,7 +695,7 @@ export function useCreateRoll() {
         }
         result = Math.floor(evaluated);
         total = result + modifier;
-        diceTypeStr = diceDescriptionParts.join(" + ") || diceType;
+        diceTypeStr = breakdown;
       } else if (statValue !== undefined) {
         const diceSides = getStatDiceSides(statValue);
         diceTypeStr = diceSides.map(d => `d${d}`).join("+");
