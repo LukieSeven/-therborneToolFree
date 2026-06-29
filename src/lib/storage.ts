@@ -8,6 +8,7 @@ export interface FavoriteSlot {
 
 export interface FamiliarAbility {
   id: number;
+  characterId?: number;
   name: string;
   description: string;
   cost: number;
@@ -15,8 +16,27 @@ export interface FamiliarAbility {
   range: string;
   speed: string;
   rollFormula: string;
-  linkedStat: string;
+  linkedStats: string[];
   assignedToQuickRolls: boolean;
+  level?: number;
+  active?: boolean;
+  type?: string;
+  essenceId?: number | null;
+  equipmentId?: number | null;
+  resistances?: string;
+  immunities?: string;
+  bonusPower?: number;
+  bonusVitality?: number;
+  bonusSpirit?: number;
+  bonusAgility?: number;
+  bonusEndurance?: number;
+  bonusPrecision?: number;
+  bonusWillpower?: number;
+  bonusCharisma?: number;
+  bonusHp?: string | number;
+  bonusMana?: string | number;
+  bonusDt?: string | number;
+  sortOrder?: number;
 }
 
 export interface Familiar {
@@ -155,6 +175,8 @@ export interface Ability {
   resistances?: string;
   immunities?: string;
   equipmentId?: number | null;
+  sortOrder?: number;
+  type?: string;
 }
 
 export interface Skill {
@@ -1028,8 +1050,14 @@ export function importCharacterJSON(jsonString: string): Character {
   }
 
   // Insert character with new ID
+  let nameToUse = mergedCharacter.name;
+  if (chars.some(c => c.name.toLowerCase() === mergedCharacter.name.toLowerCase())) {
+    nameToUse = `${mergedCharacter.name} (Copy)`;
+  }
+
   const importedChar: Character = {
     ...mergedCharacter,
+    name: nameToUse,
     id: nextCharId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()

@@ -384,6 +384,35 @@ export default function CharacterSheet() {
   const [famAbilityDesc, setFamAbilityDesc] = useState("");
   const [famAbilityCost, setFamAbilityCost] = useState(0);
   const [famAbilityFormula, setFamAbilityFormula] = useState("");
+  const [editingFamAbilityId, setEditingFamAbilityId] = useState<{ famId: string | number; abilityId: number } | null>(null);
+  const [famAbilityType, setFamAbilityType] = useState("");
+  const [famAbilityCooldown, setFamAbilityCooldown] = useState(0);
+  const [famAbilityRange, setFamAbilityRange] = useState("Melee");
+  const [famAbilitySpeed, setFamAbilitySpeed] = useState("Standard");
+  const [famAbilityLinkedStats, setFamAbilityLinkedStats] = useState<string[]>([]);
+  const [famAbilityAssignedToQuickRolls, setFamAbilityAssignedToQuickRolls] = useState(false);
+  const [famAbilityResistances, setFamAbilityResistances] = useState("");
+  const [famAbilityImmunities, setFamAbilityImmunities] = useState("");
+
+  const [famAbilityBonusPower, setFamAbilityBonusPower] = useState(0);
+  const [famAbilityBonusVitality, setFamAbilityBonusVitality] = useState(0);
+  const [famAbilityBonusSpirit, setFamAbilityBonusSpirit] = useState(0);
+  const [famAbilityBonusAgility, setFamAbilityBonusAgility] = useState(0);
+  const [famAbilityBonusEndurance, setFamAbilityBonusEndurance] = useState(0);
+  const [famAbilityBonusPrecision, setFamAbilityBonusPrecision] = useState(0);
+  const [famAbilityBonusWillpower, setFamAbilityBonusWillpower] = useState(0);
+  const [famAbilityBonusCharisma, setFamAbilityBonusCharisma] = useState(0);
+
+  const [famAbilityBonusHp, setFamAbilityBonusHp] = useState("");
+  const [famAbilityBonusMana, setFamAbilityBonusMana] = useState("");
+  const [famAbilityBonusDt, setFamAbilityBonusDt] = useState("");
+
+  // ── Notes Import Ref ──
+  const notesFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // ── Drag and Drop States ──
+  const [draggedAbilityId, setDraggedAbilityId] = useState<number | null>(null);
+  const [draggedFamAbIdx, setDraggedFamAbIdx] = useState<number | null>(null);
 
   // ── Notes Filter & Search ──────────────────────────────────
   const [noteSearchQuery, setNoteSearchQuery] = useState("");
@@ -904,28 +933,42 @@ export default function CharacterSheet() {
               return [next, ...filtered].slice(0, 10);
             });
 
-            if (wasCrit) {
-              const breakdownStr = `${rolled}!`;
-              setCritChain({
-                chainCount: 0,
-                chainDie,
-                runningDiceTotal: rolled,
-                modifier,
-                label: lbl,
-                lastRolledValue: rolled,
-                rolls: [{ label: "Roll 1", breakdown: breakdownStr, total: rolled }]
-              });
-            } else {
+            const isCustomFormula = !statValue && (/[a-zA-Z]/.test(diceType) || /[+\-*/]/.test(diceType));
+
+            if (isCustomFormula) {
               setLastRoll({
                 rawRoll: rolled,
-                modifier,
-                total: rolled + modifier,
-                hadCrit: false,
+                modifier: 0,
+                total: rolled,
+                hadCrit: wasCrit,
                 maxChainCount: -1,
                 diceType: data.diceType,
-                label: lbl,
-                rolls: [{ label: "Roll 1", breakdown: String(rolled), total: rolled }]
+                label: lbl
               });
+            } else {
+              if (wasCrit) {
+                const breakdownStr = `${rolled}!`;
+                setCritChain({
+                  chainCount: 0,
+                  chainDie,
+                  runningDiceTotal: rolled,
+                  modifier,
+                  label: lbl,
+                  lastRolledValue: rolled,
+                  rolls: [{ label: "Roll 1", breakdown: breakdownStr, total: rolled }]
+                });
+              } else {
+                setLastRoll({
+                  rawRoll: rolled,
+                  modifier,
+                  total: rolled + modifier,
+                  hadCrit: false,
+                  maxChainCount: -1,
+                  diceType: data.diceType,
+                  label: lbl,
+                  rolls: [{ label: "Roll 1", breakdown: String(rolled), total: rolled }]
+                });
+              }
             }
             setRollingDice(null);
           }, 600);
@@ -1535,12 +1578,28 @@ export default function CharacterSheet() {
       name: famAbilityName,
       description: famAbilityDesc,
       cost: famAbilityCost,
-      cooldown: 0,
-      range: "Melee",
-      speed: "Standard",
+      cooldown: famAbilityCooldown,
+      range: famAbilityRange,
+      speed: famAbilitySpeed,
       rollFormula: famAbilityFormula,
-      linkedStat: "power",
-      assignedToQuickRolls: false
+      linkedStats: famAbilityLinkedStats,
+      assignedToQuickRolls: famAbilityAssignedToQuickRolls,
+      type: famAbilityType,
+      resistances: famAbilityResistances,
+      immunities: famAbilityImmunities,
+      bonusPower: famAbilityBonusPower,
+      bonusVitality: famAbilityBonusVitality,
+      bonusSpirit: famAbilityBonusSpirit,
+      bonusAgility: famAbilityBonusAgility,
+      bonusEndurance: famAbilityBonusEndurance,
+      bonusPrecision: famAbilityBonusPrecision,
+      bonusWillpower: famAbilityBonusWillpower,
+      bonusCharisma: famAbilityBonusCharisma,
+      bonusHp: famAbilityBonusHp,
+      bonusMana: famAbilityBonusMana,
+      bonusDt: famAbilityBonusDt,
+      level: 1,
+      active: false
     };
 
     const updated = {
@@ -1548,12 +1607,107 @@ export default function CharacterSheet() {
       abilities: [...(fam.abilities || []), newAb]
     };
     updateFamiliarData(famId, updated);
+    resetFamAbilityForm(famId);
+    toast.success("Familiar ability added.");
+  };
+
+  const handleEditFamAbilityStart = (famId: string | number, ab: FamiliarAbility) => {
+    setEditingFamAbilityId({ famId, abilityId: ab.id });
+    setFamAbilityName(ab.name);
+    setFamAbilityDesc(ab.description);
+    setFamAbilityCost(ab.cost);
+    setFamAbilityCooldown(ab.cooldown || 0);
+    setFamAbilityRange(ab.range || "Melee");
+    setFamAbilitySpeed(ab.speed || "Standard");
+    setFamAbilityFormula(ab.rollFormula || "");
+    setFamAbilityType(ab.type || "");
+    setFamAbilityLinkedStats(ab.linkedStats || []);
+    setFamAbilityAssignedToQuickRolls(!!ab.assignedToQuickRolls);
+    setFamAbilityResistances(ab.resistances || "");
+    setFamAbilityImmunities(ab.immunities || "");
+    setFamAbilityBonusPower(ab.bonusPower || 0);
+    setFamAbilityBonusVitality(ab.bonusVitality || 0);
+    setFamAbilityBonusSpirit(ab.bonusSpirit || 0);
+    setFamAbilityBonusAgility(ab.bonusAgility || 0);
+    setFamAbilityBonusEndurance(ab.bonusEndurance || 0);
+    setFamAbilityBonusPrecision(ab.bonusPrecision || 0);
+    setFamAbilityBonusWillpower(ab.bonusWillpower || 0);
+    setFamAbilityBonusCharisma(ab.bonusCharisma || 0);
+    setFamAbilityBonusHp(ab.bonusHp !== undefined ? String(ab.bonusHp) : "");
+    setFamAbilityBonusMana(ab.bonusMana !== undefined ? String(ab.bonusMana) : "");
+    setFamAbilityBonusDt(ab.bonusDt !== undefined ? String(ab.bonusDt) : "");
+    
+    setIsAddingFamAbility(prev => ({ ...prev, [famId]: true }));
+  };
+
+  const handleUpdateFamAbility = (famId: string | number, abId: number) => {
+    const list = character.familiars ? [...character.familiars] : [];
+    const fam = list.find(f => f.id === famId);
+    if (!fam || !famAbilityName.trim()) return;
+
+    const updatedAbilities = fam.abilities.map(a => {
+      if (a.id === abId) {
+        return {
+          ...a,
+          name: famAbilityName,
+          description: famAbilityDesc,
+          cost: famAbilityCost,
+          cooldown: famAbilityCooldown,
+          range: famAbilityRange,
+          speed: famAbilitySpeed,
+          rollFormula: famAbilityFormula,
+          type: famAbilityType,
+          linkedStats: famAbilityLinkedStats,
+          assignedToQuickRolls: famAbilityAssignedToQuickRolls,
+          resistances: famAbilityResistances,
+          immunities: famAbilityImmunities,
+          bonusPower: famAbilityBonusPower,
+          bonusVitality: famAbilityBonusVitality,
+          bonusSpirit: famAbilityBonusSpirit,
+          bonusAgility: famAbilityBonusAgility,
+          bonusEndurance: famAbilityBonusEndurance,
+          bonusPrecision: famAbilityBonusPrecision,
+          bonusWillpower: famAbilityBonusWillpower,
+          bonusCharisma: famAbilityBonusCharisma,
+          bonusHp: famAbilityBonusHp,
+          bonusMana: famAbilityBonusMana,
+          bonusDt: famAbilityBonusDt
+        };
+      }
+      return a;
+    });
+
+    updateFamiliarData(famId, { ...fam, abilities: updatedAbilities });
+    resetFamAbilityForm(famId);
+    toast.success("Familiar ability updated.");
+  };
+
+  const resetFamAbilityForm = (famId: string | number) => {
     setFamAbilityName("");
     setFamAbilityDesc("");
     setFamAbilityCost(0);
+    setFamAbilityCooldown(0);
+    setFamAbilityRange("Melee");
+    setFamAbilitySpeed("Standard");
     setFamAbilityFormula("");
+    setFamAbilityType("");
+    setFamAbilityLinkedStats([]);
+    setFamAbilityAssignedToQuickRolls(false);
+    setFamAbilityResistances("");
+    setFamAbilityImmunities("");
+    setFamAbilityBonusPower(0);
+    setFamAbilityBonusVitality(0);
+    setFamAbilityBonusSpirit(0);
+    setFamAbilityBonusAgility(0);
+    setFamAbilityBonusEndurance(0);
+    setFamAbilityBonusPrecision(0);
+    setFamAbilityBonusWillpower(0);
+    setFamAbilityBonusCharisma(0);
+    setFamAbilityBonusHp("");
+    setFamAbilityBonusMana("");
+    setFamAbilityBonusDt("");
+    setEditingFamAbilityId(null);
     setIsAddingFamAbility(prev => ({ ...prev, [famId]: false }));
-    toast.success("Familiar ability added.");
   };
 
   const handleDeleteFamAbility = (famId: string | number, abId: number) => {
@@ -1564,6 +1718,155 @@ export default function CharacterSheet() {
     const filtered = fam.abilities.filter(a => a.id !== abId);
     updateFamiliarData(famId, { ...fam, abilities: filtered });
     toast.success("Familiar ability removed.");
+  };
+
+  // ── Notes Backup & Restore ──
+  const handleExportNotes = () => {
+    if (!notes || notes.length === 0) {
+      toast.error("No notes to export!");
+      return;
+    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(notes, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `${character.name.toLowerCase().replace(/\s+/g, "_")}_campaign_notes.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    toast.success("Notes exported successfully!");
+  };
+
+  const handleImportNotesFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target?.result as string;
+      try {
+        const importedNotes = JSON.parse(text);
+        if (!Array.isArray(importedNotes)) {
+          throw new Error("Invalid format. Expected an array of notes.");
+        }
+        
+        let importCount = 0;
+        const existingNotes = notes || [];
+        for (const note of importedNotes) {
+          if (note.title && note.content) {
+            let titleToUse = note.title;
+            const exists = existingNotes.some(n => n.title.toLowerCase() === note.title.toLowerCase());
+            if (exists) {
+              titleToUse = `${note.title} (Copy)`;
+            }
+            createNote.mutate({
+              characterId: Number(id),
+              title: titleToUse,
+              content: note.content,
+              category: note.category || "general",
+              tags: Array.isArray(note.tags) ? note.tags : [],
+              images: Array.isArray(note.images) ? note.images : []
+            });
+            importCount++;
+          }
+        }
+        toast.success(`Successfully imported ${importCount} notes!`);
+      } catch (err) {
+        toast.error("Failed to parse notes file.");
+        console.error(err);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  // ── Familiar Full Rest ──
+  const handleFamFullRest = (fam: Familiar) => {
+    const fMax = getFamiliarMaxValues(fam);
+    setFamDtFlashes(prev => ({
+      ...prev,
+      [fam.id]: "restore"
+    }));
+    setFamDamageResults(prev => {
+      const copy = { ...prev };
+      delete copy[fam.id];
+      return copy;
+    });
+    updateFamiliarData(fam.id, { 
+      ...fam, 
+      currentHp: fMax.maxHp,
+      currentDt: fMax.maxDt,
+      currentMana: fMax.maxMana
+    });
+    toast.success(`${fam.name} completed a Full Rest. Vitals restored.`);
+    setTimeout(() => {
+      setFamDtFlashes(prev => ({
+        ...prev,
+        [fam.id]: null
+      }));
+    }, 600);
+  };
+
+  // ── Drag and Drop Handlers ──
+  const handleAbilityDragStart = (e: React.DragEvent, abilityId: number) => {
+    setDraggedAbilityId(abilityId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleAbilityDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleAbilityDrop = (e: React.DragEvent, targetAbilityId: number, groupAbilities: Ability[]) => {
+    e.preventDefault();
+    if (draggedAbilityId === null || draggedAbilityId === targetAbilityId) return;
+
+    const draggedAbility = abilities.find(a => a.id === draggedAbilityId);
+    const targetAbility = abilities.find(a => a.id === targetAbilityId);
+    if (!draggedAbility || !targetAbility) return;
+
+    if (draggedAbility.essenceId !== targetAbility.essenceId) {
+      toast.error("Abilities must be kept within their assigned essence.");
+      return;
+    }
+
+    const draggedIndex = groupAbilities.findIndex(a => a.id === draggedAbilityId);
+    const targetIndex = groupAbilities.findIndex(a => a.id === targetAbilityId);
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const reordered = [...groupAbilities];
+    const [draggedItem] = reordered.splice(draggedIndex, 1);
+    reordered.splice(targetIndex, 0, draggedItem);
+
+    // Update sortOrder for all items in this group
+    reordered.forEach((ab, idx) => {
+      updateAbility.mutate({
+        id: ab.id,
+        data: { sortOrder: idx }
+      });
+    });
+
+    setDraggedAbilityId(null);
+    toast.success("Abilities reordered.");
+  };
+
+  const handleFamAbDragStart = (e: React.DragEvent, idx: number) => {
+    setDraggedFamAbIdx(idx);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleFamAbDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleFamAbDrop = (e: React.DragEvent, fam: Familiar, targetIdx: number) => {
+    e.preventDefault();
+    if (draggedFamAbIdx === null || draggedFamAbIdx === targetIdx) return;
+    const items = [...fam.abilities];
+    const [draggedItem] = items.splice(draggedFamAbIdx, 1);
+    items.splice(targetIdx, 0, draggedItem);
+    
+    updateFamiliarData(fam.id, { ...fam, abilities: items });
+    setDraggedFamAbIdx(null);
+    toast.success("Familiar abilities reordered.");
   };
 
   // Backup Imports
@@ -1584,6 +1887,22 @@ export default function CharacterSheet() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const chunkArray = <T>(arr: T[], size: number): T[][] => {
+    const chunks: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+      chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+  };
+
+  const sortAbilities = (list: Ability[]) => {
+    return [...list].sort((a, b) => {
+      const orderA = a.sortOrder !== undefined ? a.sortOrder : a.id;
+      const orderB = b.sortOrder !== undefined ? b.sortOrder : b.id;
+      return orderA - orderB;
+    });
   };
 
   const activeFavorites = getFavorites(character, equipment, abilities);
@@ -1608,7 +1927,7 @@ export default function CharacterSheet() {
   const finalTier = lastRoll?.hadCrit ? CRIT_TIERS[Math.min(lastRoll.maxChainCount, CRIT_TIERS.length - 1)] : null;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto animate-in fade-in duration-500 space-y-6">
+    <div className="p-4 max-w-7xl mx-auto animate-in fade-in duration-500 space-y-4">
       
       {/* ── Top Header Controls ── */}
       <div className="flex items-center justify-between border-b border-border/40 pb-3 flex-wrap gap-3">
@@ -2595,7 +2914,17 @@ export default function CharacterSheet() {
 
         {/* TAB 1: STATS & TRAINING (Base Stats Only) */}
         {activeTab === "stats" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center border-b border-border/20 pb-2 mb-4 min-h-[52px]">
+              <div className="flex items-center gap-2.5">
+                <Hammer className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-primary">Attributes & Training</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Manage base stats and track training progress</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {STATS.map(stat => {
               const baseValue = (character as any)[stat.key] as number;
               const trainingKey = `${stat.key}Training`;
@@ -2656,13 +2985,20 @@ export default function CharacterSheet() {
               );
             })}
           </div>
+        </div>
         )}
 
         {/* TAB 2: SKILLS (Card click rolls) */}
         {activeTab === "skills" && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center border-b border-border/20 pb-2">
-              <h3 className="text-lg font-serif text-primary font-bold">Skills Log</h3>
+            <div className="flex justify-between items-center border-b border-border/20 pb-2 mb-4 min-h-[52px]">
+              <div className="flex items-center gap-2.5">
+                <BookText className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-primary">Skills Log</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Roll skills and train modifiers</p>
+                </div>
+              </div>
               <EditSkillsDialog characterId={id} />
             </div>
 
@@ -2732,7 +3068,17 @@ export default function CharacterSheet() {
 
         {/* TAB 3: INVENTORY */}
         {activeTab === "inventory" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center border-b border-border/20 pb-2 mb-4 min-h-[52px]">
+              <div className="flex items-center gap-2.5">
+                <Coins className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-primary">Bag / Gear</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Manage inventory, currency, and equipped gear</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
             
             {/* Currencies */}
             <div className="space-y-4">
@@ -2975,12 +3321,21 @@ export default function CharacterSheet() {
               initialData={itemAbInitialData}
             />
           </div>
+        </div>
         )}
 
         {/* TAB 4: ESSENCE CONFLUENCE */}
         {activeTab === "essences" && (
           <div className="space-y-4">
-            <h3 className="text-lg font-serif text-primary font-bold border-b border-border/20 pb-2">Essence Confluence</h3>
+            <div className="flex justify-between items-center border-b border-border/20 pb-2 mb-4 min-h-[52px]">
+              <div className="flex items-center gap-2.5">
+                <Layers className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-primary">Essence Confluence</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Bind and align essence crystals to unlock attributes</p>
+                </div>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map(slot => {
@@ -3062,19 +3417,60 @@ export default function CharacterSheet() {
             )}
           </div>
         )}
+                  }`}>
+                    {slot === 4 && (
+                      <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+                    )}
+                    
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] uppercase tracking-widest font-mono text-muted-foreground font-bold">
+                          {label}
+                        </span>
+                        {essence && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive rounded-none cursor-pointer" onClick={() => deleteEssence.mutate({ id: essence.id, charId: id })}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
 
-        {/* TAB 5: ABILITIES */}
+                      {essence ? (
+                        <div className="space-y-1">
+                          <h4 className={`font-serif text-lg font-bold ${slot === 4 ? "text-amber-400" : "text-foreground"}`}>{essence.name}</h4>
+                          <p className="text-xs text-muted-foreground/80 font-serif leading-relaxed line-clamp-3">{essence.description}</p>
+                        </div>
+                      ) : slot === 4 ? (
+                        <div className="py-4 text-center">
+                          <Button
+                            size="sm"
+                            className="bg-amber-500/20 border border-amber-500/30 text-amber-500 hover:bg-amber-500/30 h-7 text-xs font-serif rounded-none cursor-pointer font-bold transition-all"
+                            onClick={() => setEssenceSlotInput(slot)}
+                          >
+                            + Unleash Confluence
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="py-4 text-center">
+                          <Button
+                            size="sm"
+                            className="bg-primary/20 border border-primary/30 text-primary hover:bg        {/* TAB 5: ABILITIES */}
         {activeTab === "abilities" && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center border-b border-border/20 pb-2">
-              <h3 className="text-xl font-serif text-primary font-bold">Shaped Abilities</h3>
-              <EditAbilitiesDialog characterId={id} />
+          <div className="space-y-4">
+            <div className="flex justify-between items-center border-b border-border/20 pb-2 mb-4 min-h-[52px]">
+              <div className="flex items-center gap-2.5">
+                <Flame className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-primary">Shaped Abilities</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Activate and cast abilities using mana</p>
+                </div>
+              </div>
+              <EditAbilitiesDialog characterId={id} abilities={abilities} />
             </div>
 
             {(() => {
               // Helper to render ability card
-              const renderAbilityCard = (ability: Ability) => {
-                const isExpanded = !!expandedAbilities[ability.id];
+              const renderAbilityCard = (ability: Ability, currentGroupList: Ability[], forceExpand?: boolean) => {
+                const isExpanded = forceExpand !== undefined ? forceExpand : !!expandedAbilities[ability.id];
                 
                 // Collect and format flat bonuses to display
                 const bonuses: string[] = [];
@@ -3093,51 +3489,63 @@ export default function CharacterSheet() {
                 if (ability.immunities) bonuses.push(`Immunities: ${ability.immunities}`);
 
                 return (
-                  <Card key={ability.id} className="bg-card border border-border/40 hover:border-primary/20 transition-all rounded-md overflow-hidden">
-                    <CardContent className="p-4 space-y-3">
+                  <Card 
+                    key={ability.id} 
+                    draggable={true}
+                    onDragStart={(e) => handleAbilityDragStart(e, ability.id)}
+                    onDragOver={handleAbilityDragOver}
+                    onDrop={(e) => handleAbilityDrop(e, ability.id, currentGroupList)}
+                    className="bg-card border border-border/40 hover:border-primary/20 transition-all rounded-none overflow-hidden cursor-grab active:cursor-grabbing relative"
+                  >
+                    <CardContent className="p-3.5 space-y-2">
                       {/* Header row (Clickable card body toggles expansion except buttons) */}
                       <div 
                         className="flex justify-between items-start cursor-pointer select-none"
                         onClick={() => setExpandedAbilities(prev => ({ ...prev, [ability.id]: !isExpanded }))}
                       >
                         <div className="space-y-1.5 flex-1 pr-4">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-serif text-lg font-bold text-primary leading-tight hover:text-primary/80 transition-colors">
-                              {ability.name}
-                            </h4>
-                            <svg className={`w-3.5 h-3.5 text-muted-foreground/60 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
-                          </div>
-                          
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge variant="outline" className="text-[9px] font-mono border-primary/20 text-primary rounded-md bg-background/50">{ability.cost} MP</Badge>
-                            <Badge variant="outline" className="text-[9px] font-mono border-border/60 text-muted-foreground rounded-md bg-background/50">{ability.range}</Badge>
-                            <Badge variant="outline" className="text-[9px] font-mono border-border/60 text-muted-foreground rounded-md bg-background/50">{ability.speed}</Badge>
-                            
-                            {/* Level Incrementer */}
-                            <div className="flex items-center gap-1 border border-border/50 px-1.5 py-0.5 rounded-md bg-background/50 text-[10px] font-semibold text-foreground font-mono" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {/* Level Incrementer moved here (top left) */}
+                            <div className="flex items-center gap-1 border border-border/40 px-1.5 py-0.5 rounded-none bg-background/50 text-[10px] font-semibold text-muted-foreground font-mono" onClick={e => e.stopPropagation()}>
                               <span>Lvl: {ability.level || 1}</span>
                               <button 
                                 type="button"
                                 onClick={() => handleAbilityLevelChange(ability.id, "down")} 
-                                className="w-3.5 h-3.5 flex items-center justify-center bg-accent hover:bg-accent/80 text-foreground rounded text-[9px] font-bold cursor-pointer ml-1"
+                                className="w-3.5 h-3.5 flex items-center justify-center bg-accent hover:bg-accent/80 text-foreground rounded-none text-[9px] font-bold cursor-pointer"
                               >
                                 -
                               </button>
                               <button 
                                 type="button"
                                 onClick={() => handleAbilityLevelChange(ability.id, "up")} 
-                                className="w-3.5 h-3.5 flex items-center justify-center bg-accent hover:bg-accent/80 text-foreground rounded text-[9px] font-bold cursor-pointer"
+                                className="w-3.5 h-3.5 flex items-center justify-center bg-accent hover:bg-accent/80 text-foreground rounded-none text-[9px] font-bold cursor-pointer"
                               >
                                 +
                               </button>
                             </div>
 
+                            <h4 className="font-serif text-lg font-bold text-primary leading-tight hover:text-primary/80 transition-colors flex items-center gap-1.5 flex-wrap">
+                              {ability.name}
+                              {ability.type && (
+                                <Badge className="bg-primary/10 border border-primary/30 text-primary text-[8px] font-bold uppercase tracking-wider rounded-none px-1.5 py-0.5">
+                                  {ability.type}
+                                </Badge>
+                              )}
+                            </h4>
+                            <svg className={`w-3.5 h-3.5 text-muted-foreground/60 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant="outline" className="text-[9px] font-mono border-primary/20 text-primary rounded-none bg-background/50">{ability.cost} MP</Badge>
+                            <Badge variant="outline" className="text-[9px] font-mono border-border/60 text-muted-foreground rounded-none bg-background/50">{ability.range}</Badge>
+                            <Badge variant="outline" className="text-[9px] font-mono border-border/60 text-muted-foreground rounded-none bg-background/50">{ability.speed}</Badge>
+                            
                             {/* Active Toggle Switch */}
                             <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                               <button
                                 type="button"
                                 onClick={() => toggleAbilityActive(ability)}
-                                className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase transition-all border cursor-pointer ${
+                                className={`px-2 py-0.5 rounded-none text-[9px] font-bold uppercase transition-all border cursor-pointer ${
                                   ability.active 
                                     ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 drop-shadow-[0_0_4px_rgba(16,185,129,0.3)]" 
                                     : "bg-background/40 border-border/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"
@@ -3157,7 +3565,7 @@ export default function CharacterSheet() {
                                 key={statKey}
                                 size="sm"
                                 onClick={() => handleAbilityRoll(ability, statKey)}
-                                className="bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 h-7 text-xs font-serif rounded-md cursor-pointer whitespace-nowrap"
+                                className="bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 h-7 text-xs font-serif rounded-none cursor-pointer whitespace-nowrap"
                               >
                                 <Dice5 className="w-3 h-3 mr-1" /> Roll ({statKey.substring(0, 3).toUpperCase()})
                               </Button>
@@ -3166,7 +3574,7 @@ export default function CharacterSheet() {
                             <Button
                               size="sm"
                               onClick={() => handleAbilityRoll(ability)}
-                              className="bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 h-7 text-xs font-serif rounded-md cursor-pointer"
+                              className="bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 h-7 text-xs font-serif rounded-none cursor-pointer"
                             >
                               <Dice5 className="w-3 h-3 mr-1" /> Use Ability
                             </Button>
@@ -3178,7 +3586,7 @@ export default function CharacterSheet() {
                       {isExpanded && (
                         <div className="border-t border-border/20 pt-3 space-y-2.5 animate-in slide-in-from-top-2 duration-200">
                           {ability.rollFormula && (
-                            <div className="text-[10px] font-mono text-muted-foreground bg-background/50 border border-border/30 px-2.5 py-1.5 rounded-md flex items-center justify-between">
+                            <div className="text-[10px] font-mono text-muted-foreground bg-background/50 border border-border/30 px-2.5 py-1.5 rounded-none flex items-center justify-between">
                               <span>Formula: <code className="text-primary font-bold">{ability.rollFormula}</code></span>
                             </div>
                           )}
@@ -3204,16 +3612,32 @@ export default function CharacterSheet() {
                 );
               };
 
+              const renderAbilityGrid = (abilitiesList: Ability[]) => {
+                const chunks = chunkArray(abilitiesList, 2);
+                return (
+                  <div className="space-y-4">
+                    {chunks.map((row, rowIdx) => {
+                      const isRowExpanded = row.some(ab => expandedAbilities[ab.id]);
+                      return (
+                        <div key={rowIdx} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {row.map(ab => renderAbilityCard(ab, abilitiesList, isRowExpanded))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              };
+
               // Group abilities by Essence Slot
               const slots = [1, 2, 3, 4];
               const grouped = slots.map(slotNum => {
                 const ess = essences?.find(e => e.slot === slotNum);
                 const label = slotNum === 1 ? "First Essence" : slotNum === 2 ? "Second Essence" : slotNum === 3 ? "Third Essence" : "Confluence";
-                const attachedAbilities = abilities?.filter(a => ess && a.essenceId === ess.id) || [];
+                const attachedAbilities = sortAbilities(abilities?.filter(a => ess && a.essenceId === ess.id && !a.equipmentId) || []);
                 return { slotNum, ess, label, abilities: attachedAbilities };
               });
 
-              const unassignedAbilities = abilities?.filter(a => (!a.essenceId || !essences?.some(e => e.id === a.essenceId)) && !a.equipmentId) || [];
+              const unassignedAbilities = sortAbilities(abilities?.filter(a => (!a.essenceId || !essences?.some(e => e.id === a.essenceId)) && !a.equipmentId) || []);
 
               return (
                 <div className="space-y-6">
@@ -3227,6 +3651,45 @@ export default function CharacterSheet() {
                             <span>{label}: {ess.name}</span>
                           </h4>
                           <span className="text-[10px] font-mono text-muted-foreground font-semibold">
+                            Shaped Abilities: {attached.length} / 5
+                          </span>
+                        </div>
+
+                        {attached.length > 0 ? (
+                          renderAbilityGrid(attached)
+                        ) : (
+                          <p className="text-xs text-muted-foreground/60 italic font-serif py-2">
+                            No abilities shaped to this Essence. (Max 5)
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Unassigned Group */}
+                  {unassignedAbilities.length > 0 && (
+                    <div className="space-y-3 border-l-2 border-border/20 pl-4 py-1">
+                      <div className="flex justify-between items-baseline border-b border-border/20 pb-1.5">
+                        <h4 className="font-serif text-lg font-bold text-muted-foreground">Unassigned Abilities</h4>
+                        <span className="text-[10px] font-mono text-muted-foreground font-semibold">
+                          Total: {unassignedAbilities.length}
+                        </span>
+                      </div>
+                      {renderAbilityGrid(unassignedAbilities)}
+                    </div>
+                  )}
+
+                  {/* Empty State when no abilities exist at all */}
+                  {(!abilities || abilities.length === 0) && (
+                    <div className="text-center py-12 bg-card/30 border border-dashed border-border/40 rounded-none text-sm text-muted-foreground/60 italic font-serif">
+                      No abilities registered yet. Click "Edit Abilities" to manage your spellbook.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}                   <span className="text-[10px] font-mono text-muted-foreground font-semibold">
                             Shaped Abilities: {attached.length} / 5
                           </span>
                         </div>
@@ -3274,7 +3737,42 @@ export default function CharacterSheet() {
         {/* TAB 6: CAMPAIGN NOTES (Search and Thematic Filter) */}
         {activeTab === "notes" && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+            <div className="flex justify-between items-center border-b border-border/20 pb-2 mb-4 min-h-[52px] flex-wrap gap-3">
+              <div className="flex items-center gap-2.5">
+                <BookText className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-primary">Campaign Notes</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Record adventure logs, fact entries, and journals</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input 
+                  type="file" 
+                  ref={notesFileInputRef} 
+                  onChange={handleImportNotesFile} 
+                  accept=".json" 
+                  className="hidden" 
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => notesFileInputRef.current?.click()} 
+                  className="rounded-none border-primary/40 text-primary hover:bg-primary/10 cursor-pointer text-xs uppercase tracking-wider font-mono h-8"
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1" /> Import Notes
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleExportNotes} 
+                  className="rounded-none border-primary/40 text-primary hover:bg-primary/10 cursor-pointer text-xs uppercase tracking-wider font-mono h-8"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1" /> Export Notes
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
               
               {/* Note creation column */}
               <div className="lg:col-span-1">
@@ -3296,6 +3794,7 @@ export default function CharacterSheet() {
                           <option value="general">GENERAL</option>
                           <option value="location">PLACE / LOCATION</option>
                           <option value="npc">PERSON / NPC</option>
+                          <option value="organization">ORGANIZATION</option>
                           <option value="item">THING / ITEM</option>
                           <option value="lore">FACT / LORE</option>
                           <option value="bestiary">BESTIARY</option>
@@ -3356,7 +3855,7 @@ export default function CharacterSheet() {
                     className="bg-background/50 border-border/50 text-xs rounded-none h-8 flex-1"
                   />
                   <div className="flex gap-1 flex-wrap">
-                    {["all", "general", "npc", "location", "item", "lore", "bestiary"].map(cat => (
+                    {["all", "general", "npc", "organization", "location", "item", "lore", "bestiary"].map(cat => (
                       <button
                         key={cat}
                         onClick={() => setNoteCategoryFilter(cat)}
@@ -3366,7 +3865,7 @@ export default function CharacterSheet() {
                             : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent/30"
                         }`}
                       >
-                        {cat === "all" ? "All" : cat === "npc" ? "People" : cat === "location" ? "Places" : cat === "item" ? "Things" : cat === "lore" ? "Facts" : cat === "bestiary" ? "Bestiary" : "Gen"}
+                        {cat === "all" ? "All" : cat === "npc" ? "People" : cat === "organization" ? "Orgs" : cat === "location" ? "Places" : cat === "item" ? "Things" : cat === "lore" ? "Facts" : cat === "bestiary" ? "Bestiary" : "Gen"}
                       </button>
                     ))}
                   </div>
@@ -3842,40 +4341,193 @@ export default function CharacterSheet() {
                                 <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Attacks & Actions</h5>
                                 <Button 
                                   size="sm" 
-                                  className="bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30 h-6 text-[10px] rounded-md cursor-pointer"
+                                  className="bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30 h-6 text-[10px] rounded-none cursor-pointer"
                                   onClick={() => setIsAddingFamAbility(prev => ({ ...prev, [fam.id]: !isAddingAb }))}
                                 >
                                   <Plus className="w-3 h-3 mr-1" /> Add Action
                                 </Button>
                               </div>
 
-                              {/* Add Action Form inside expansion */}
+                              {/* Add/Edit Action Form inside expansion */}
                               {isAddingAb && (
-                                <Card className="bg-background border border-primary/20 rounded-md">
+                                <Card className="bg-background border border-primary/20 rounded-none">
                                   <CardContent className="p-4 space-y-4">
-                                    <h5 className="font-serif text-sm text-primary font-bold">New Action / Spell for {fam.name}</h5>
-                                    <form onSubmit={(e) => handleCreateFamAbility(fam.id, e)} className="space-y-3 text-xs">
+                                    <h5 className="font-serif text-sm text-primary font-bold">
+                                      {editingFamAbilityId ? `Edit Action for ${fam.name}` : `Shape Action / Spell for ${fam.name}`}
+                                    </h5>
+                                    <form 
+                                      onSubmit={(e) => {
+                                        if (editingFamAbilityId) {
+                                          handleUpdateFamAbility(fam.id, editingFamAbilityId.abilityId);
+                                        } else {
+                                          handleCreateFamAbility(fam.id, e);
+                                        }
+                                      }} 
+                                      className="space-y-4 text-xs font-sans"
+                                    >
                                       <div className="grid grid-cols-2 gap-3">
                                         <div>
                                           <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Ability Name</label>
-                                          <Input value={famAbilityName} onChange={e => setFamAbilityName(e.target.value)} required placeholder="e.g. Bite, Fire Spit" className="bg-background text-sm rounded-md h-8" />
+                                          <Input value={famAbilityName} onChange={e => setFamAbilityName(e.target.value)} required placeholder="e.g. Bite, Fire Spit" className="bg-background rounded-none h-8 text-xs" />
                                         </div>
                                         <div>
-                                          <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Mana Cost (MP)</label>
-                                          <Input type="number" min={0} value={famAbilityCost} onChange={e => setFamAbilityCost(Number(e.target.value))} required className="bg-background text-sm rounded-md h-8 font-mono" />
+                                          <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Ability Type</label>
+                                          <select 
+                                            value={famAbilityType} 
+                                            onChange={e => setFamAbilityType(e.target.value)} 
+                                            className="w-full h-8 rounded-none border border-border/60 bg-background px-3 py-1 text-xs shadow-sm transition-colors text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                          >
+                                            <option value="">None</option>
+                                            <option value="Attack">Attack</option>
+                                            <option value="Buff">Buff</option>
+                                            <option value="Debuff">Debuff</option>
+                                            <option value="Defense">Defense</option>
+                                            <option value="Movement">Movement</option>
+                                            <option value="Utility">Utility</option>
+                                          </select>
                                         </div>
                                       </div>
+
+                                      {/* Linked Attributes checkboxes */}
                                       <div>
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Description</label>
-                                        <Textarea value={famAbilityDesc} onChange={e => setFamAbilityDesc(e.target.value)} placeholder="Describe effect details..." className="bg-background text-sm font-serif rounded-md min-h-[60px]" />
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1.5">Linked Attributes (For Roll Modifiers)</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                          {["power", "vitality", "spirit", "agility", "endurance", "precision", "willpower", "charisma"].map(stat => {
+                                            const isChecked = famAbilityLinkedStats.includes(stat);
+                                            return (
+                                              <div key={stat} className="flex items-center gap-2 bg-background border border-border/40 p-2 rounded-none">
+                                                <Checkbox 
+                                                  id={`fam_link_${stat}`} 
+                                                  checked={isChecked} 
+                                                  onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                      setFamAbilityLinkedStats([...famAbilityLinkedStats, stat]);
+                                                    } else {
+                                                      setFamAbilityLinkedStats(famAbilityLinkedStats.filter(s => s !== stat));
+                                                    }
+                                                  }} 
+                                                />
+                                                <label htmlFor={`fam_link_${stat}`} className="text-[10px] font-mono font-bold uppercase cursor-pointer">
+                                                  {stat.substring(0, 3)}
+                                                </label>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
+
+                                      <div className="grid grid-cols-4 gap-3">
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Mana Cost</label>
+                                          <Input type="number" min={0} value={famAbilityCost} onChange={e => setFamAbilityCost(Number(e.target.value))} required className="bg-background font-mono rounded-none h-8 text-xs" />
+                                        </div>
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Cooldown (sec)</label>
+                                          <Input type="number" min={0} value={famAbilityCooldown} onChange={e => setFamAbilityCooldown(Number(e.target.value))} required className="bg-background font-mono rounded-none h-8 text-xs" />
+                                        </div>
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Range</label>
+                                          <Input value={famAbilityRange} onChange={e => setFamAbilityRange(e.target.value)} placeholder="e.g. Melee, 30ft" className="bg-background rounded-none h-8 text-xs" />
+                                        </div>
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Speed</label>
+                                          <Input value={famAbilitySpeed} onChange={e => setFamAbilitySpeed(e.target.value)} placeholder="e.g. Standard, Instant" className="bg-background rounded-none h-8 text-xs" />
+                                        </div>
+                                      </div>
+
                                       <div>
-                                        <label className="text-[10px] font-bold text-primary uppercase block mb-1">Roll Formula (optional)</label>
-                                        <Input value={famAbilityFormula} onChange={e => setFamAbilityFormula(e.target.value)} placeholder="e.g. d6 + 2, POW*2" className="bg-background text-sm rounded-md h-8 font-mono" />
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Roll Formula / Modifier (Optional)</label>
+                                        <Input value={famAbilityFormula} onChange={e => setFamAbilityFormula(e.target.value)} placeholder="e.g. d20+powr+6, 2d6+prer" className="bg-background font-mono rounded-none h-8 text-xs" />
                                       </div>
-                                      <div className="flex justify-end gap-1.5 pt-2 border-t border-border/30">
-                                        <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddingFamAbility(prev => ({ ...prev, [fam.id]: false }))} className="rounded-md">Cancel</Button>
-                                        <Button type="submit" size="sm" className="bg-primary text-primary-foreground font-serif rounded-md">Save Action</Button>
+
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Resistances (Granted while active)</label>
+                                          <Input value={famAbilityResistances} onChange={e => setFamAbilityResistances(e.target.value)} placeholder="e.g. Fire, Piercing" className="bg-background rounded-none h-8 text-xs" />
+                                        </div>
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Immunities (Granted while active)</label>
+                                          <Input value={famAbilityImmunities} onChange={e => setFamAbilityImmunities(e.target.value)} placeholder="e.g. Poison, Stun" className="bg-background rounded-none h-8 text-xs" />
+                                        </div>
+                                      </div>
+
+                                      {/* Description textarea */}
+                                      <div>
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Description / Effects</label>
+                                        <Textarea value={famAbilityDesc} onChange={e => setFamAbilityDesc(e.target.value)} placeholder="Describe the effects..." className="bg-background rounded-none font-serif text-sm min-h-[60px]" />
+                                      </div>
+
+                                      {/* Stat Modifiers */}
+                                      <div className="border-t border-border/20 pt-3 space-y-2">
+                                        <h5 className="font-serif font-bold text-primary text-xs">Stat Modifiers (Granted while active)</h5>
+                                        <div className="grid grid-cols-4 gap-2">
+                                          <div>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Power</label>
+                                            <Input type="number" value={famAbilityBonusPower} onChange={e => setFamAbilityBonusPower(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                                          </div>
+                                          <div>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Vitality</label>
+                                            <Input type="number" value={famAbilityBonusVitality} onChange={e => setFamAbilityBonusVitality(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                                          </div>
+                                          <div>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Spirit</label>
+                                            <Input type="number" value={famAbilityBonusSpirit} onChange={e => setFamAbilityBonusSpirit(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                                          </div>
+                                          <div>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Agility</label>
+                                            <Input type="number" value={famAbilityBonusAgility} onChange={e => setFamAbilityBonusAgility(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                                          </div>
+                                          <div>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Endurance</label>
+                                            <Input type="number" value={famAbilityBonusEndurance} onChange={e => setFamAbilityBonusEndurance(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                                          </div>
+                                          <div>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Precision</label>
+                                            <Input type="number" value={famAbilityBonusPrecision} onChange={e => setFamAbilityBonusPrecision(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                                          </div>
+                                          <div>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Willpower</label>
+                                            <Input type="number" value={famAbilityBonusWillpower} onChange={e => setFamAbilityBonusWillpower(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                                          </div>
+                                          <div>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Charisma</label>
+                                            <Input type="number" value={famAbilityBonusCharisma} onChange={e => setFamAbilityBonusCharisma(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Vitals Modifiers Grid */}
+                                      <div className="grid grid-cols-3 gap-2">
+                                        <div>
+                                          <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">HP Mod</label>
+                                          <Input value={famAbilityBonusHp} onChange={e => setFamAbilityBonusHp(e.target.value)} placeholder="e.g. +5" className="bg-background font-mono h-7 text-xs rounded-none" />
+                                        </div>
+                                        <div>
+                                          <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Mana Mod</label>
+                                          <Input value={famAbilityBonusMana} onChange={e => setFamAbilityBonusMana(e.target.value)} placeholder="e.g. +10" className="bg-background font-mono h-7 text-xs rounded-none" />
+                                        </div>
+                                        <div>
+                                          <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">DT Mod</label>
+                                          <Input value={famAbilityBonusDt} onChange={e => setFamAbilityBonusDt(e.target.value)} placeholder="e.g. +1" className="bg-background font-mono h-7 text-xs rounded-none" />
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-2 pt-1">
+                                        <Checkbox 
+                                          id="fam_quick_roll" 
+                                          checked={famAbilityAssignedToQuickRolls} 
+                                          onCheckedChange={(checked) => setFamAbilityAssignedToQuickRolls(!!checked)} 
+                                        />
+                                        <label htmlFor="fam_quick_roll" className="font-bold text-[10px] text-muted-foreground uppercase cursor-pointer">
+                                          Assign to Quick Rolls HUD
+                                        </label>
+                                      </div>
+
+                                      <div className="flex justify-end gap-2 border-t border-border/30 pt-3">
+                                        <Button type="button" variant="ghost" onClick={() => resetFamAbilityForm(fam.id)} className="rounded-none">Cancel</Button>
+                                        <Button type="submit" className="bg-primary text-primary-foreground font-serif rounded-none">
+                                          {editingFamAbilityId ? "Save Action" : "Shape Action"}
+                                        </Button>
                                       </div>
                                     </form>
                                   </CardContent>
@@ -3885,26 +4537,46 @@ export default function CharacterSheet() {
                               {/* Action items list */}
                               {fam.abilities && fam.abilities.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {fam.abilities.map(ab => (
-                                    <Card key={ab.id} className="bg-background border border-border/30 rounded-md relative group">
-                                      <div className="absolute top-0 right-0 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10 rounded-md cursor-pointer" onClick={() => handleDeleteFamAbility(fam.id, ab.id)}>
+                                  {fam.abilities.map((ab, idx) => (
+                                    <Card 
+                                      key={ab.id} 
+                                      draggable={true}
+                                      onDragStart={(e) => handleFamAbDragStart(e, idx)}
+                                      onDragOver={handleFamAbDragOver}
+                                      onDrop={(e) => handleFamAbDrop(e, fam, idx)}
+                                      className="bg-background border border-border/30 rounded-none relative group cursor-grab active:cursor-grabbing"
+                                    >
+                                      <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10 rounded-none cursor-pointer" onClick={() => handleEditFamAbilityStart(fam.id, ab)}>
+                                          <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10 rounded-none cursor-pointer" onClick={() => handleDeleteFamAbility(fam.id, ab.id)}>
                                           <Trash2 className="w-3 h-3" />
                                         </Button>
                                       </div>
                                       <CardContent className="p-3.5 space-y-2">
-                                        <div className="flex justify-between items-start pr-6">
+                                        <div className="flex justify-between items-start pr-12 flex-wrap gap-2">
                                           <div>
-                                            <h6 className="font-serif text-sm font-bold text-primary">{ab.name}</h6>
-                                            <div className="flex gap-1.5 mt-1">
-                                              <Badge variant="outline" className="text-[8px] font-mono border-primary/20 text-primary rounded-md bg-background/50">{ab.cost} MP</Badge>
-                                              {ab.rollFormula && <Badge variant="outline" className="text-[8px] font-mono border-border/50 text-muted-foreground rounded-md bg-background/50">Formula: {ab.rollFormula}</Badge>}
+                                            <h6 className="font-serif text-sm font-bold text-primary flex items-center gap-1.5 flex-wrap">
+                                              {ab.name}
+                                              {ab.type && (
+                                                <Badge className="bg-primary/10 border border-primary/30 text-primary text-[8px] font-bold uppercase tracking-wider rounded-none px-1.5 py-0.5">
+                                                  {ab.type}
+                                                </Badge>
+                                              )}
+                                            </h6>
+                                            <div className="flex gap-1.5 mt-1 flex-wrap">
+                                              <Badge variant="outline" className="text-[8px] font-mono border-primary/20 text-primary rounded-none bg-background/50">{ab.cost} MP</Badge>
+                                              {ab.cooldown ? <Badge variant="outline" className="text-[8px] font-mono border-border/50 text-muted-foreground rounded-none bg-background/50">{ab.cooldown}s CD</Badge> : null}
+                                              <Badge variant="outline" className="text-[8px] font-mono border-border/50 text-muted-foreground rounded-none bg-background/50">{ab.range}</Badge>
+                                              <Badge variant="outline" className="text-[8px] font-mono border-border/50 text-muted-foreground rounded-none bg-background/50">{ab.speed}</Badge>
+                                              {ab.rollFormula && <Badge variant="outline" className="text-[8px] font-mono border-border/50 text-muted-foreground rounded-none bg-background/50">Formula: {ab.rollFormula}</Badge>}
                                             </div>
                                           </div>
                                           <Button
                                             size="sm"
                                             onClick={() => handleFamiliarAbilityRoll(fam, ab)}
-                                            className="bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 h-6 font-serif text-[10px] rounded-md cursor-pointer"
+                                            className="bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 h-6 font-serif text-[10px] rounded-none cursor-pointer"
                                           >
                                             Execute
                                           </Button>

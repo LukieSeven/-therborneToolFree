@@ -640,17 +640,22 @@ export function useCreateRoll() {
           
           if (regexFull.test(expression) || regexPrefix.test(expression)) {
             const statVal = (finalStats[statKey] !== undefined ? finalStats[statKey] : 10) as number;
+            const statMod = Math.floor(statVal / 3);
             const { total: rolledSum, desc, isCrit: crit } = rollStatDice(statVal);
             if (crit) isCrit = true;
             
-            expression = expression.split(rolledFullPattern).join(String(rolledSum));
-            expression = expression.split(rolledPrefixPattern).join(String(rolledSum));
+            const totalRolled = rolledSum + statMod;
+            expression = expression.split(rolledFullPattern).join(String(totalRolled));
+            expression = expression.split(rolledPrefixPattern).join(String(totalRolled));
             
             const critSuffix = crit ? "!" : "";
+            const breakdownText = statMod !== 0 
+              ? `${rolledSum}${critSuffix}+${statMod}`
+              : `${rolledSum}${critSuffix}`;
             const regexFullInsensitive = new RegExp(rolledFullPattern, "gi");
             const regexPrefixInsensitive = new RegExp(rolledPrefixPattern, "gi");
-            breakdown = breakdown.replace(regexFullInsensitive, `${rolledSum}${critSuffix}`);
-            breakdown = breakdown.replace(regexPrefixInsensitive, `${rolledSum}${critSuffix}`);
+            breakdown = breakdown.replace(regexFullInsensitive, breakdownText);
+            breakdown = breakdown.replace(regexPrefixInsensitive, breakdownText);
           }
         }
 

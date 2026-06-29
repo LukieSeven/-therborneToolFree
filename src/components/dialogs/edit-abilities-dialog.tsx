@@ -1,22 +1,22 @@
 import React, { useState } from "react";
-import { useListAbilities, useAddAbility, useUpdateAbility, useDeleteAbility, useListEssences } from "@/hooks/useStorage";
+import { useListEssences, useAddAbility, useUpdateAbility, useDeleteAbility } from "@/hooks/useStorage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Edit2, ShieldAlert } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { Edit2, Trash2 } from "lucide-react";
+import { Ability } from "@/lib/storage";
 
 interface Props {
   characterId: number;
+  abilities: Ability[];
 }
 
 const STAT_OPTIONS = ["power", "vitality", "spirit", "agility", "endurance", "precision", "willpower", "charisma"];
 
-export function EditAbilitiesDialog({ characterId }: Props) {
-  const [isOpen, setIsOpen] = useState(false);
-  const { data: abilities } = useListAbilities(characterId);
+export function EditAbilitiesDialog({ characterId, abilities }: Props) {
   const { data: essences } = useListEssences(characterId);
   const addAbility = useAddAbility();
   const updateAbility = useUpdateAbility();
@@ -34,6 +34,7 @@ export function EditAbilitiesDialog({ characterId }: Props) {
   const [range, setRange] = useState("");
   const [speed, setSpeed] = useState("");
   const [rollFormula, setRollFormula] = useState("");
+  const [type, setType] = useState("");
   const [linkedStats, setLinkedStats] = useState<string[]>([]);
   const [assignedToQuickRolls, setAssignedToQuickRolls] = useState(false);
   const [essenceId, setEssenceId] = useState<number | null>(null);
@@ -61,6 +62,7 @@ export function EditAbilitiesDialog({ characterId }: Props) {
     setRange("");
     setSpeed("");
     setRollFormula("");
+    setType("");
     setLinkedStats([]);
     setAssignedToQuickRolls(false);
     setEssenceId(null);
@@ -94,6 +96,7 @@ export function EditAbilitiesDialog({ characterId }: Props) {
     setRange(ability.range);
     setSpeed(ability.speed);
     setRollFormula(ability.rollFormula);
+    setType(ability.type || "");
     setLinkedStats(ability.linkedStats || (ability.linkedStat ? [ability.linkedStat] : []));
     setAssignedToQuickRolls(ability.assignedToQuickRolls);
     setEssenceId(ability.essenceId || null);
@@ -135,6 +138,7 @@ export function EditAbilitiesDialog({ characterId }: Props) {
       range,
       speed,
       rollFormula,
+      type,
       linkedStats,
       assignedToQuickRolls,
       essenceId,
@@ -151,6 +155,8 @@ export function EditAbilitiesDialog({ characterId }: Props) {
       bonusHp,
       bonusMana,
       bonusDt,
+      level: editingId ? (abilities.find(a => a.id === editingId)?.level || 1) : 1,
+      active: editingId ? !!(abilities.find(a => a.id === editingId)?.active) : false,
     };
 
     if (mode === "add") {
@@ -173,38 +179,43 @@ export function EditAbilitiesDialog({ characterId }: Props) {
     }
   };
 
+  const characterAbilities = (abilities || []).filter(a => !a.equipmentId);
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if(!open) setMode("list"); }}>
+    <Dialog open={mode !== "list" || mode === "list"} onOpenChange={(open) => { if (!open) setMode("list"); }}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="border-primary/40 text-primary hover:bg-primary/10 font-serif text-sm">
+        <Button variant="outline" className="border-primary/40 text-primary hover:bg-primary/10 font-serif text-sm rounded-none">
           Edit Abilities
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[650px] max-h-[80vh] overflow-y-auto bg-card border-border shadow-2xl">
-        <DialogHeader className="border-b border-border/30 pb-3 flex flex-row items-center justify-between">
-          <DialogTitle className="font-serif text-2xl text-primary font-bold">
-            {mode === "list" && "Shaped Abilities"}
-            {mode === "add" && "Shape New Ability"}
-            {mode === "edit" && "Modify Shaped Ability"}
+      <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto bg-card border border-border shadow-2xl rounded-none p-5">
+        <DialogHeader className="border-b border-border/30 pb-2">
+          <DialogTitle className="font-serif text-2xl text-primary font-bold flex justify-between items-center">
+            <span>
+              {mode === "list" ? "Manage Abilities" : mode === "add" ? "Shape New Ability" : "Edit Shaped Ability"}
+            </span>
+            {mode === "list" && (
+              <Button size="sm" onClick={handleOpenAdd} className="bg-primary text-primary-foreground font-serif rounded-none cursor-pointer">
+                + Add Ability
+              </Button>
+            )}
           </DialogTitle>
-          {mode === "list" && (
-            <Button size="sm" onClick={handleOpenAdd} className="bg-primary text-primary-foreground font-serif">
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add Ability
-            </Button>
-          )}
         </DialogHeader>
 
         {mode === "list" ? (
-          <div className="space-y-3 mt-4">
-            {abilities && abilities.length > 0 ? (
+          <div className="space-y-3 mt-4 text-xs">
+            {characterAbilities.length > 0 ? (
               <div className="divide-y divide-border/40">
-                {abilities.map((ability) => (
+                {characterAbilities.map((ability) => (
                   <div key={ability.id} className="py-3 flex justify-between items-start group">
                     <div className="space-y-1">
-                      <div className="font-serif text-lg text-foreground font-semibold flex items-center gap-2">
+                      <div className="font-serif text-base text-foreground font-semibold flex items-center gap-2 flex-wrap">
                         {ability.name}
+                        {ability.type && (
+                          <span className="text-[9px] uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded-none font-bold font-sans tracking-wide">{ability.type}</span>
+                        )}
                         {ability.assignedToQuickRolls && (
-                          <span className="text-[9px] uppercase bg-primary/10 border border-primary/30 text-primary px-1.5 py-0.5 rounded">Quick Roll</span>
+                          <span className="text-[9px] uppercase bg-primary/10 border border-primary/30 text-primary px-1.5 py-0.5 rounded-none font-bold font-sans">Quick Roll</span>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground font-mono">
@@ -212,10 +223,10 @@ export function EditAbilitiesDialog({ characterId }: Props) {
                       </p>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(ability)} className="h-8 w-8 text-primary hover:bg-primary/10">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(ability)} className="h-8 w-8 text-primary hover:bg-primary/10 rounded-none cursor-pointer">
                         <Edit2 className="w-3.5 h-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(ability.id)} className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(ability.id)} className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-none cursor-pointer">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -229,18 +240,18 @@ export function EditAbilitiesDialog({ characterId }: Props) {
             )}
           </div>
         ) : (
-          <form onSubmit={handleSave} className="space-y-4 mt-4 text-sm font-sans">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSave} className="space-y-4 mt-4 text-xs font-sans">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Ability Name</label>
-                <Input value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Fireball, Cleave" className="bg-background" />
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Ability Name</label>
+                <Input value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Fireball, Cleave" className="bg-background rounded-none" />
               </div>
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Essence Source</label>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Essence Source</label>
                 <select 
                   value={essenceId === null ? "" : essenceId} 
                   onChange={e => setEssenceId(e.target.value === "" ? null : Number(e.target.value))} 
-                  className="w-full h-9 rounded-md border border-border/60 bg-background px-3 py-1 text-sm shadow-sm transition-colors text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full h-9 rounded-none border border-border/60 bg-background px-3 py-1 text-xs shadow-sm transition-colors text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="">None (Unassigned)</option>
                   {essences?.map(ess => (
@@ -254,12 +265,12 @@ export function EditAbilitiesDialog({ characterId }: Props) {
 
             {/* Linked Attributes checkboxes */}
             <div>
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Linked Attributes (For Roll Modifiers)</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1.5">Linked Attributes (For Roll Modifiers)</label>
               <div className="grid grid-cols-4 gap-2">
                 {STAT_OPTIONS.map(stat => {
                   const isChecked = linkedStats.includes(stat);
                   return (
-                    <div key={stat} className="flex items-center gap-2 bg-background border border-border/40 p-2 rounded-md">
+                    <div key={stat} className="flex items-center gap-2 bg-background border border-border/40 p-2 rounded-none">
                       <Checkbox 
                         id={`link_${stat}`} 
                         checked={isChecked} 
@@ -271,7 +282,7 @@ export function EditAbilitiesDialog({ characterId }: Props) {
                           }
                         }} 
                       />
-                      <label htmlFor={`link_${stat}`} className="text-xs font-mono font-bold uppercase cursor-pointer">
+                      <label htmlFor={`link_${stat}`} className="text-[10px] font-mono font-bold uppercase cursor-pointer">
                         {stat.substring(0, 3)}
                       </label>
                     </div>
@@ -280,134 +291,134 @@ export function EditAbilitiesDialog({ characterId }: Props) {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-5 gap-2.5">
               <div>
                 <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Mana Cost</label>
-                <Input type="number" min={0} value={cost} onChange={e => setCost(Number(e.target.value))} required className="bg-background font-mono" />
+                <Input type="number" min={0} value={cost} onChange={e => setCost(Number(e.target.value))} required className="bg-background font-mono rounded-none" />
               </div>
               <div>
                 <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Cooldown (sec)</label>
-                <Input type="number" min={0} value={cooldown} onChange={e => setCooldown(Number(e.target.value))} required className="bg-background font-mono" />
+                <Input type="number" min={0} value={cooldown} onChange={e => setCooldown(Number(e.target.value))} required className="bg-background font-mono rounded-none" />
               </div>
               <div>
                 <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Range</label>
-                <Input value={range} onChange={e => setRange(e.target.value)} placeholder="e.g. Melee, 30ft" className="bg-background" />
+                <Input value={range} onChange={e => setRange(e.target.value)} placeholder="e.g. Melee, 30ft" className="bg-background rounded-none" />
               </div>
               <div>
                 <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Speed</label>
-                <Input value={speed} onChange={e => setSpeed(e.target.value)} placeholder="e.g. Standard, Instant" className="bg-background" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Roll Formula (Optional)</label>
-                <Input value={rollFormula} onChange={e => setRollFormula(e.target.value)} placeholder="e.g. STATr*3, 2d6, d8+2" className="bg-background font-mono" />
-              </div>
-              <div className="flex items-center gap-2 pt-6">
-                <Checkbox 
-                  id="quick_roll" 
-                  checked={assignedToQuickRolls} 
-                  onCheckedChange={(checked) => setAssignedToQuickRolls(!!checked)} 
-                />
-                <label htmlFor="quick_roll" className="text-xs font-bold text-muted-foreground uppercase tracking-wider cursor-pointer">
-                  Assign to Quick Rolls HUD
-                </label>
-              </div>
-            </div>
-
-            {/* Stat & Resource Bonuses */}
-            <div className="border-t border-border/30 pt-4 space-y-4">
-              <div>
-                <h4 className="text-xs font-bold text-primary uppercase tracking-widest mb-2 font-serif">Flat Stat Bonuses</h4>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { label: "POW", val: bonusPower, set: setBonusPower },
-                    { label: "VIT", val: bonusVitality, set: setBonusVitality },
-                    { label: "SPI", val: bonusSpirit, set: setBonusSpirit },
-                    { label: "AGI", val: bonusAgility, set: setBonusAgility },
-                    { label: "END", val: bonusEndurance, set: setBonusEndurance },
-                    { label: "PRE", val: bonusPrecision, set: setBonusPrecision },
-                    { label: "WIL", val: bonusWillpower, set: setBonusWillpower },
-                    { label: "CHA", val: bonusCharisma, set: setBonusCharisma },
-                  ].map(stat => (
-                    <div key={stat.label}>
-                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">{stat.label}</label>
-                      <Input 
-                        type="number" 
-                        value={stat.val === 0 ? "" : stat.val} 
-                        onChange={e => stat.set(e.target.value === "" ? 0 : Number(e.target.value))} 
-                        placeholder="+0"
-                        className="bg-background h-8 font-mono text-xs text-center" 
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-bold text-primary uppercase tracking-widest mb-2 font-serif">Resource Pool Formulas/Bonuses</h4>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Max HP</label>
-                    <Input 
-                      type="text" 
-                      value={bonusHp} 
-                      onChange={e => setBonusHp(e.target.value)} 
-                      placeholder="e.g. VIT*5, +10"
-                      className="bg-background h-8 font-mono text-xs text-center" 
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Max Mana</label>
-                    <Input 
-                      type="text" 
-                      value={bonusMana} 
-                      onChange={e => setBonusMana(e.target.value)} 
-                      placeholder="e.g. SPI*5, +10"
-                      className="bg-background h-8 font-mono text-xs text-center" 
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Max DT</label>
-                    <Input 
-                      type="text" 
-                      value={bonusDt} 
-                      onChange={e => setBonusDt(e.target.value)} 
-                      placeholder="e.g. WIL*2, +2"
-                      className="bg-background h-8 font-mono text-xs text-center" 
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Resistances & Immunities */}
-            <div className="grid grid-cols-2 gap-4 border-t border-border/30 pt-4">
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Resistances Granted</label>
-                <Input value={resistances} onChange={e => setResistances(e.target.value)} placeholder="e.g. Fire, Pierce" className="bg-background" />
+                <Input value={speed} onChange={e => setSpeed(e.target.value)} placeholder="e.g. Standard, Instant" className="bg-background rounded-none" />
               </div>
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Immunities Granted</label>
-                <Input value={immunities} onChange={e => setImmunities(e.target.value)} placeholder="e.g. Poison, Stun" className="bg-background" />
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Type</label>
+                <select 
+                  value={type} 
+                  onChange={e => setType(e.target.value)} 
+                  className="w-full h-9 rounded-none border border-border/60 bg-background px-3 py-1 text-xs shadow-sm transition-colors text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">None</option>
+                  <option value="Attack">Attack</option>
+                  <option value="Buff">Buff</option>
+                  <option value="Debuff">Debuff</option>
+                  <option value="Defense">Defense</option>
+                  <option value="Movement">Movement</option>
+                  <option value="Utility">Utility</option>
+                </select>
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Description (Markdown Supported)</label>
-              <Textarea 
-                value={description} 
-                onChange={e => setDescription(e.target.value)} 
-                placeholder="Write details... lists, bolding, and flavor paragraphs fully render." 
-                className="min-h-[100px] bg-background font-serif" 
+              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Roll Formula / Modifier (Optional)</label>
+              <Input value={rollFormula} onChange={e => setRollFormula(e.target.value)} placeholder="e.g. d20+powr+6, 2d6+prer" className="bg-background font-mono rounded-none" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Resistances (Granted while active)</label>
+                <Input value={resistances} onChange={e => setResistances(e.target.value)} placeholder="e.g. Fire, Piercing" className="bg-background rounded-none" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Immunities (Granted while active)</label>
+                <Input value={immunities} onChange={e => setImmunities(e.target.value)} placeholder="e.g. Poison, Stun" className="bg-background rounded-none" />
+              </div>
+            </div>
+
+            {/* Description textarea */}
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Description / Effects</label>
+              <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the effects of this ability..." className="bg-background min-h-[60px] rounded-none font-serif text-sm" />
+            </div>
+
+            {/* Stat & Resource Bonuses */}
+            <div className="border-t border-border/20 pt-3 space-y-2">
+              <h5 className="font-serif font-bold text-primary text-sm">Stat Modifiers (Granted while active)</h5>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Power</label>
+                  <Input type="number" value={bonusPower} onChange={e => setBonusPower(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Vitality</label>
+                  <Input type="number" value={bonusVitality} onChange={e => setBonusVitality(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Spirit</label>
+                  <Input type="number" value={bonusSpirit} onChange={e => setBonusSpirit(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Agility</label>
+                  <Input type="number" value={bonusAgility} onChange={e => setBonusAgility(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Endurance</label>
+                  <Input type="number" value={bonusEndurance} onChange={e => setBonusEndurance(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Precision</label>
+                  <Input type="number" value={bonusPrecision} onChange={e => setBonusPrecision(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Willpower</label>
+                  <Input type="number" value={bonusWillpower} onChange={e => setBonusWillpower(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Charisma</label>
+                  <Input type="number" value={bonusCharisma} onChange={e => setBonusCharisma(Number(e.target.value))} className="bg-background font-mono h-7 text-xs rounded-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Vitals Modifiers Grid */}
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">HP Mod</label>
+                <Input value={bonusHp} onChange={e => setBonusHp(e.target.value)} placeholder="e.g. +5, -2" className="bg-background font-mono h-7 text-xs rounded-none" />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">Mana Mod</label>
+                <Input value={bonusMana} onChange={e => setBonusMana(e.target.value)} placeholder="e.g. +10, -5" className="bg-background font-mono h-7 text-xs rounded-none" />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-0.5">DT Mod</label>
+                <Input value={bonusDt} onChange={e => setBonusDt(e.target.value)} placeholder="e.g. +1, -1" className="bg-background font-mono h-7 text-xs rounded-none" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox 
+                id="quick_roll" 
+                checked={assignedToQuickRolls} 
+                onCheckedChange={(checked) => setAssignedToQuickRolls(!!checked)} 
               />
+              <label htmlFor="quick_roll" className="font-bold text-[10px] text-muted-foreground uppercase cursor-pointer">
+                Assign to Quick Rolls HUD
+              </label>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border/30 pt-4">
-              <Button type="button" variant="ghost" onClick={() => setMode("list")}>Back</Button>
-              <Button type="submit" className="bg-primary text-primary-foreground font-serif">
-                {mode === "add" ? "Create Ability" : "Save Changes"}
+              <Button type="button" variant="ghost" onClick={resetForm} className="rounded-none">Reset</Button>
+              <Button type="button" variant="ghost" onClick={() => setMode("list")} className="rounded-none">Cancel</Button>
+              <Button type="submit" className="bg-primary text-primary-foreground font-serif rounded-none">
+                {mode === "add" ? "Shape Ability" : "Save Changes"}
               </Button>
             </div>
           </form>
