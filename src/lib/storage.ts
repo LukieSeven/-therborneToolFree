@@ -1157,6 +1157,54 @@ export function importCharacterJSON(jsonString: string): Character {
   return importedChar;
 }
 
+export function exportBackupJSON(): void {
+  const data = {
+    backup: true,
+    characters: getList<Character>(KEYS.characters),
+    equipment: getList<Equipment>(KEYS.equipment),
+    currencies: getList<Currency>(KEYS.currencies),
+    inventory: getList<InventoryItem>(KEYS.inventory),
+    essences: getList<Essence>(KEYS.essences),
+    abilities: getList<Ability>(KEYS.abilities),
+    skills: getList<Skill>(KEYS.skills),
+    notes: getList<Note>(KEYS.notes),
+    rolls: getList<any>(KEYS.rolls),
+  };
+
+  const filename = `the_grimoire_backup_${new Date().toISOString().slice(0, 10)}.json`;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function importBackupJSON(jsonString: string): { type: "backup" | "character"; count?: number; character?: Character } {
+  const data = JSON.parse(jsonString);
+  if (data.backup === true) {
+    if (Array.isArray(data.characters)) setList(KEYS.characters, data.characters);
+    if (Array.isArray(data.equipment)) setList(KEYS.equipment, data.equipment);
+    if (Array.isArray(data.currencies)) setList(KEYS.currencies, data.currencies);
+    if (Array.isArray(data.inventory)) setList(KEYS.inventory, data.inventory);
+    if (Array.isArray(data.essences)) setList(KEYS.essences, data.essences);
+    if (Array.isArray(data.abilities)) setList(KEYS.abilities, data.abilities);
+    if (Array.isArray(data.skills)) setList(KEYS.skills, data.skills);
+    if (Array.isArray(data.notes)) setList(KEYS.notes, data.notes);
+    if (Array.isArray(data.rolls)) setList(KEYS.rolls, data.rolls);
+    safeStorage.setItem("aetherborne_initialized", "true");
+    return { type: "backup", count: data.characters?.length || 0 };
+  } else if (data.character) {
+    const character = importCharacterJSON(jsonString);
+    return { type: "character", character };
+  } else {
+    throw new Error("Invalid backup or character sheet file format");
+  }
+}
+
 // ── Default Mock Database Initialization ──────────────────
 
 function initializeDefaultSample(): void {

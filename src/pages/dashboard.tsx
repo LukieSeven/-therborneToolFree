@@ -1,15 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useListCharacters, useCreateCharacter, useListRecaps, useCreateRecap, useDeleteRecap } from "@/hooks/useStorage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertCircle, Loader2, Plus, Trash2, BookOpen } from "lucide-react";
+import { AlertCircle, Loader2, Plus, Trash2, BookOpen, Upload, Download } from "lucide-react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { CustomizeToolDialog } from "@/components/dialogs/customize-tool-dialog";
 import { RollGuideDialog } from "@/components/dialogs/roll-guide-dialog";
+import { exportBackupJSON, importBackupJSON } from "@/lib/storage";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const { data: characters, isLoading: loadingChars } = useListCharacters();
@@ -18,6 +21,49 @@ export default function Dashboard() {
   const createRecap = useCreateRecap();
   const deleteRecap = useDeleteRecap();
   const [, setLocation] = useLocation();
+
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportBackup = () => {
+    try {
+      exportBackupJSON();
+      toast.success("Campaign data and characters exported successfully!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to export data.");
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const res = importBackupJSON(text);
+        queryClient.invalidateQueries();
+        if (res.type === "backup") {
+          toast.success(`Successfully restored campaign backup! Loaded ${res.count} characters.`);
+        } else if (res.type === "character") {
+          toast.success(`Successfully imported character: ${res.character?.name}`);
+          if (res.character) {
+            setLocation(`/characters/${res.character.id}`);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to parse file. Make sure it is a valid backup or character sheet JSON.");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const [isOpen, setIsOpen] = useState(false);
 
@@ -173,9 +219,36 @@ export default function Dashboard() {
         </div>
 
         {/* Ethereal New Character Dialog Trigger */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
           <CustomizeToolDialog />
           <RollGuideDialog />
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".json"
+            className="hidden"
+          />
+
+          <Button 
+            variant="outline" 
+            onClick={handleImportClick}
+            className="h-10 text-sm font-serif border border-border/60 hover:bg-accent/40 hover:text-foreground rounded-md cursor-pointer flex items-center gap-1.5 px-4 font-bold text-muted-foreground transition-all"
+            title="Import a character sheet or campaign backup (.json)"
+          >
+            <Upload className="w-4 h-4 text-primary" /> Import Data
+          </Button>
+
+          <Button 
+            variant="outline" 
+            onClick={handleExportBackup}
+            className="h-10 text-sm font-serif border border-border/60 hover:bg-accent/40 hover:text-foreground rounded-md cursor-pointer flex items-center gap-1.5 px-4 font-bold text-muted-foreground transition-all"
+            title="Export all characters and campaign data (.json)"
+          >
+            <Download className="w-4 h-4 text-primary" /> Export Backup
+          </Button>
+
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90 text-base font-serif font-bold tracking-wide px-6 py-5 rounded-md border border-primary/60 animate-ethereal-pulse shadow-lg transition-transform cursor-pointer">
