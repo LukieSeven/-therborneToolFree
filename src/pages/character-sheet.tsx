@@ -524,7 +524,7 @@ export default function CharacterSheet() {
       if (skill) {
         name = skill.name;
         costStr = `Val: ${skill.value}`;
-        statStr = `+${Math.floor(skill.value / 3) + skill.training}`;
+        statStr = `+${Math.floor((Number(skill.value) || 0) / 3) + (Number(skill.training) || 0)}`;
       }
     } else if (slot.type === "familiar-attribute") {
       const fam = character.familiars?.find(f => f.id === slot.familiarId);
@@ -955,8 +955,10 @@ export default function CharacterSheet() {
   };
 
   const handleSkillRoll = (skill: Skill) => {
-    const modifier = Math.floor(skill.value / 3) + (skill.training || 0);
-    handleRoll(getDiceLabel(skill.value), `${skill.name} Skill Roll`, undefined, modifier);
+    const val = Number(skill.value) || 0;
+    const train = Number(skill.training) || 0;
+    const modifier = Math.floor(val / 3) + train;
+    handleRoll(getDiceLabel(val), `${skill.name} Skill Roll`, undefined, modifier);
   };
 
   const handleWeaponRoll = (item: Equipment) => {
@@ -1108,8 +1110,9 @@ export default function CharacterSheet() {
 
   // ── Familiar Rolls ────────────────────────────────────────
   const handleFamiliarStatRoll = (famId: string | number, statKey: string, statLabel: string, val: number) => {
-    const mod = Math.floor(val / 3);
-    const dice = getDiceLabel(val);
+    const numericVal = Number(val) || 0;
+    const mod = Math.floor(numericVal / 3);
+    const dice = getDiceLabel(numericVal);
     setRollingDice(`fam-${famId}-${statLabel}`);
     setLastRoll(null);
     setCritChain(null);
@@ -2268,7 +2271,7 @@ export default function CharacterSheet() {
                   <div className="animate-in zoom-in duration-300 w-full font-mono text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.4)]">
                     {lastRoll.hadCrit ? (
                       <p className="text-xs font-bold tracking-[0.25em] uppercase mb-2" style={{ color: finalTier?.color ?? "#ffd700" }}>
-                        ✦ {finalTier?.name ?? "Critical"} Hit! ✦
+                        ✦ {finalTier ? `${finalTier.name} Critical` : "Critical"} Hit! ✦
                       </p>
                     ) : (
                       <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500/60 mb-2 font-semibold">{lastRoll.label}</p>
@@ -3771,7 +3774,7 @@ export default function CharacterSheet() {
                           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                             {STATS.map(stat => {
                               const val = (fam as any)[stat.key] as number;
-                              const mod = Math.floor(val / 3);
+                              const mod = Math.floor((Number(val) || 0) / 3);
                               return (
                                 <button
                                   type="button"
@@ -3976,7 +3979,7 @@ export default function CharacterSheet() {
                             const newC: Combatant = {
                               id: `fam-${fam.id}-${Date.now()}`,
                               name: fam.name,
-                              initiative: 10 + Math.floor(fam.agility / 3),
+                              initiative: 10 + Math.floor((Number(fam.agility) || 0) / 3),
                               statuses: []
                             };
                             setCombatants(prev => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
