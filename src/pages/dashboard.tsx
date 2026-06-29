@@ -156,13 +156,20 @@ export default function Dashboard() {
 
       {/* Main Header Area */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border/40 pb-6">
-        <div>
-          <h1 className="text-5xl font-serif font-extrabold tracking-wider bg-gradient-to-r from-primary via-blue-200 to-primary bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(59,130,246,0.15)] mb-2">
-            The Grimoire
-          </h1>
-          <p className="text-muted-foreground font-serif italic text-base">
-            Forge your heroes and manage your campaigns.
-          </p>
+        <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+          <img 
+            src={`${import.meta.env.BASE_URL}logo.jpg`} 
+            alt="The Grimoire Logo" 
+            className="w-16 h-16 rounded-md object-cover border border-primary/30 shadow-[0_0_12px_rgba(59,130,246,0.15)] flex-shrink-0"
+          />
+          <div>
+            <h1 className="text-5xl font-serif font-extrabold tracking-wider bg-gradient-to-r from-primary via-blue-200 to-primary bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(59,130,246,0.15)] mb-2">
+              The Grimoire
+            </h1>
+            <p className="text-muted-foreground font-serif italic text-base">
+              Forge your heroes and manage your campaigns.
+            </p>
+          </div>
         </div>
 
         {/* Ethereal New Character Dialog Trigger */}

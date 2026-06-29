@@ -1468,9 +1468,20 @@ export default function CharacterSheet() {
       
       {/* ── Top Header Controls ── */}
       <div className="flex items-center justify-between border-b border-border/40 pb-3 flex-wrap gap-3">
-        <Button variant="ghost" size="sm" onClick={() => setLocation("/")} className="text-muted-foreground hover:text-foreground rounded-none cursor-pointer">
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Dashboard
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => setLocation("/")} className="text-muted-foreground hover:text-foreground rounded-none cursor-pointer pl-0">
+            <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
+          </Button>
+          <div className="h-4 w-px bg-border/40" />
+          <div className="flex items-center gap-2">
+            <img 
+              src={`${import.meta.env.BASE_URL}logo.jpg`} 
+              alt="Logo" 
+              className="w-6 h-6 rounded-md object-cover border border-primary/25 shadow-sm" 
+            />
+            <span className="font-serif text-xs font-bold text-primary tracking-wider uppercase">The Grimoire</span>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <CustomizeToolDialog />
           <RollGuideDialog />
