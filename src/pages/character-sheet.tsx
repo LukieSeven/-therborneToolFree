@@ -1611,7 +1611,7 @@ export default function CharacterSheet() {
                   : "border-border/40 bg-background/30"
                 }`}>
                   <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    <Shield className="w-4 h-4 text-primary" /> Damage Threshold
+                    <Shield className="w-4 h-4 text-yellow-500" /> Damage Threshold
                   </div>
                   <div className="text-center py-1">
                     <span className={`text-4xl font-mono font-bold ${
@@ -1630,7 +1630,7 @@ export default function CharacterSheet() {
                       {abilityDtBonus > 0 && <span className="text-[9px] text-amber-400/80 ml-0.5" title={`Flat Buff: +${abilityDtBonus}`}>[+{abilityDtBonus} Buff]</span>}
                     </span>
                   </div>
-                  <ResourceBar current={currentDt ?? character.currentDt} max={maxDt + abilityDtBonus} color={(currentDt ?? character.currentDt) > maxDt ? "#f59e0b" : "hsl(var(--primary))"} />
+                  <ResourceBar current={currentDt ?? character.currentDt} max={maxDt + abilityDtBonus} color="#eab308" />
                   
                   {/* dt quick actions: add/remove/buff */}
                   <div className="space-y-2 mt-1">
@@ -2748,9 +2748,15 @@ export default function CharacterSheet() {
                           <p className="text-xs text-muted-foreground/80 font-serif leading-relaxed line-clamp-3">{essence.description}</p>
                         </div>
                       ) : slot === 4 ? (
-                        <p className="text-xs text-muted-foreground/60 italic font-serif py-4">
-                          Attune essences 1-3 to unleash Confluence.
-                        </p>
+                        <div className="py-4 text-center">
+                          <Button
+                            size="sm"
+                            className="bg-amber-500/20 border border-amber-500/30 text-amber-500 hover:bg-amber-500/30 h-7 text-xs font-serif rounded-none cursor-pointer font-bold transition-all"
+                            onClick={() => setEssenceSlotInput(slot)}
+                          >
+                            + Unleash Confluence
+                          </Button>
+                        </div>
                       ) : (
                         <div className="py-4 text-center">
                           <Button
@@ -3356,7 +3362,7 @@ export default function CharacterSheet() {
                             : "border-border/40"
                           }`}>
                             <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                              <Shield className="w-4 h-4 text-primary" /> Familiar DT
+                              <Shield className="w-4 h-4 text-yellow-500" /> Familiar DT
                             </div>
                             <div className="text-center py-1">
                               <span className={`text-4xl font-mono font-bold ${flash === "hit" ? "text-destructive" : "text-foreground"}`}>
@@ -3364,7 +3370,7 @@ export default function CharacterSheet() {
                               </span>
                               <span className="text-xs text-muted-foreground font-mono"> /{fMax.maxDt}</span>
                             </div>
-                            <ResourceBar current={fam.currentDt} max={fMax.maxDt} color="hsl(var(--primary))" />
+                            <ResourceBar current={fam.currentDt} max={fMax.maxDt} color="#eab308" />
                             
                             <div className="space-y-2 mt-1">
                               <div className="flex gap-1.5">

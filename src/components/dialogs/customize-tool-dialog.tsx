@@ -9,6 +9,11 @@ const THEMES = [
   { id: "theme-emerald", name: "Emerald Vault", bg: "bg-[#05110d]", primary: "bg-[#10b981]", label: "Deep Forest & Mint" },
   { id: "theme-alchemist", name: "Alchemist", bg: "bg-[#0e0714]", primary: "bg-[#ab47bc]", label: "Royal Violet & Amethyst" },
   { id: "theme-bloodstone", name: "Bloodstone", bg: "bg-[#12070c]", primary: "bg-[#e53935]", label: "Dark Crimson & Coral" },
+  { id: "theme-abyss", name: "Abyss", bg: "bg-[#050607]", primary: "bg-[#d4af37]", label: "Charcoal Black & Gold" },
+  { id: "theme-chaos", name: "Chaos", bg: "bg-[#0a0512]", primary: "bg-[#ffd700]", label: "Golds & Purples in Unison" },
+  { id: "theme-rot", name: "Rot & Decay", bg: "bg-[#080906]", primary: "bg-[#8ebd43]", label: "Putrid Green & Moss" },
+  { id: "theme-structure", name: "Structure", bg: "bg-[#05080c]", primary: "bg-[#00e5ff]", label: "Cyber Teals & Purples" },
+  { id: "theme-emberborn", name: "Emberborn", bg: "bg-[#0a0605]", primary: "bg-[#ff6d00]", label: "ITS ON FIRE" },
 ];
 
 export function CustomizeToolDialog() {

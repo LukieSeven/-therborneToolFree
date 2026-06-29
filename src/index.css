@@ -102,7 +102,7 @@
   --sidebar-ring: 212 96% 58%;
 
   --app-font-sans: 'Inter', sans-serif;
-  --app-font-serif: 'Spectral', serif;
+  --app-font-serif: 'Cinzel', 'Spectral', Georgia, serif;
   --app-font-mono: 'Space Mono', monospace;
   
   --radius: 0px;
@@ -213,5 +213,50 @@ html.theme-bloodstone {
   --accent: 345 25% 14%;
   --border: 340 20% 15%;
   --ring: 345 80% 50%;
+}
+
+html.theme-abyss {
+  --background: 220 20% 2%;  /* Near Pure Black */
+  --card: 220 15% 6%;        /* Dark Charcoal */
+  --primary: 43 80% 50%;     /* Golden/Amber Accent */
+  --accent: 43 30% 12%;      /* Burnished Bronze */
+  --border: 220 10% 12%;     /* Deep Gray Border */
+  --ring: 43 80% 50%;
+}
+
+html.theme-chaos {
+  --background: 275 60% 4%;   /* Deep Void Purple */
+  --card: 275 40% 8%;         /* Shadows of Void */
+  --primary: 45 95% 52%;      /* Radiant Gold */
+  --accent: 275 50% 16%;      /* Contrasting Vivid Violet */
+  --border: 275 25% 15%;      /* Void Border */
+  --ring: 45 95% 52%;
+}
+
+html.theme-rot {
+  --background: 75 30% 3.5%;  /* Putrid Dark Olive */
+  --card: 75 20% 7%;          /* Decay Moss Grey */
+  --primary: 82 60% 45%;      /* Acidic Yellow-Green */
+  --accent: 65 20% 12%;       /* Rotting Amber-Brown */
+  --border: 75 15% 14%;       /* Sickly Border */
+  --ring: 82 60% 45%;
+}
+
+html.theme-structure {
+  --background: 220 40% 4%;   /* Structured Slate Blue */
+  --card: 220 30% 8%;         /* Grid Card */
+  --primary: 180 85% 42%;     /* Electric Teal */
+  --accent: 275 40% 15%;      /* Grid Neon Purple */
+  --border: 220 20% 14%;      /* Structural Border */
+  --ring: 180 85% 42%;
+}
+
+html.theme-emberborn {
+  --background: 12 25% 3.5%;  /* Volcanic Basalt */
+  --card: 12 15% 7%;          /* Cool Lava Rock */
+  --primary: 24 95% 50%;      /* Glowing Fire Orange */
+  --accent: 12 70% 15%;       /* Smoldering Coal Red */
+  --border: 12 25% 16%;       /* Ember Border */
+  --ring: 24 95% 50%;
 }
 

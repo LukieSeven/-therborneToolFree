@@ -201,27 +201,31 @@ export default function Dashboard() {
       `}</style>
 
       {/* Main Header Area */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border/40 pb-6">
-        <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border/20 pb-6 mt-2">
+        <div className="flex items-center gap-5 flex-wrap sm:flex-nowrap">
           <img 
             src={`${import.meta.env.BASE_URL}logo.jpg`} 
             alt="The Grimoire Logo" 
-            className="w-16 h-16 rounded-md object-cover border border-primary/30 shadow-[0_0_12px_rgba(59,130,246,0.15)] flex-shrink-0"
+            className="w-16 h-16 rounded-lg object-cover border border-primary/30 shadow-[0_0_15px_rgba(59,130,246,0.12)] flex-shrink-0"
           />
-          <div>
-            <h1 className="text-5xl font-serif font-extrabold tracking-wider bg-gradient-to-r from-primary via-blue-200 to-primary bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(59,130,246,0.15)] mb-2">
+          <div className="space-y-1">
+            <h1 className="text-4xl sm:text-5xl font-serif font-black tracking-[0.25em] uppercase bg-gradient-to-r from-primary via-foreground to-primary bg-clip-text text-transparent">
               The Grimoire
             </h1>
-            <p className="text-muted-foreground font-serif italic text-base">
+            <p className="text-sm text-muted-foreground/80 font-serif italic tracking-wide">
               Forge your heroes and manage your campaigns.
             </p>
           </div>
         </div>
+      </header>
 
-        {/* Ethereal New Character Dialog Trigger */}
-        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+      {/* Utility Control Panel Bar */}
+      <div className="bg-card/45 backdrop-blur-md border border-border/40 p-4 flex flex-wrap items-center justify-between gap-4 rounded-lg shadow-sm">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <CustomizeToolDialog />
+          <div className="h-4 w-px bg-border/30 hidden sm:block" />
           <RollGuideDialog />
+          <div className="h-4 w-px bg-border/30 hidden md:block" />
 
           <input
             type="file"
@@ -234,27 +238,28 @@ export default function Dashboard() {
           <Button 
             variant="outline" 
             onClick={handleImportClick}
-            className="h-10 text-sm font-serif border border-border/60 hover:bg-accent/40 hover:text-foreground rounded-md cursor-pointer flex items-center gap-1.5 px-4 font-bold text-muted-foreground transition-all"
+            className="h-9 text-xs font-serif border border-border/50 hover:bg-accent/40 hover:text-foreground rounded-md cursor-pointer flex items-center gap-1.5 px-3.5 font-bold text-muted-foreground transition-all"
             title="Import a character sheet or campaign backup (.json)"
           >
-            <Upload className="w-4 h-4 text-primary" /> Import Data
+            <Upload className="w-3.5 h-3.5 text-primary" /> Import Data
           </Button>
 
           <Button 
             variant="outline" 
             onClick={handleExportBackup}
-            className="h-10 text-sm font-serif border border-border/60 hover:bg-accent/40 hover:text-foreground rounded-md cursor-pointer flex items-center gap-1.5 px-4 font-bold text-muted-foreground transition-all"
+            className="h-9 text-xs font-serif border border-border/50 hover:bg-accent/40 hover:text-foreground rounded-md cursor-pointer flex items-center gap-1.5 px-3.5 font-bold text-muted-foreground transition-all"
             title="Export all characters and campaign data (.json)"
           >
-            <Download className="w-4 h-4 text-primary" /> Export Backup
+            <Download className="w-3.5 h-3.5 text-primary" /> Export Backup
           </Button>
+        </div>
 
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 text-base font-serif font-bold tracking-wide px-6 py-5 rounded-md border border-primary/60 animate-ethereal-pulse shadow-lg transition-transform cursor-pointer">
-                <Plus className="w-5 h-5 mr-2" /> New Character
-              </Button>
-            </DialogTrigger>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-serif font-bold tracking-wider px-5 py-4 h-9 rounded-md border border-primary/50 shadow-md transition-transform hover:scale-[1.02] cursor-pointer">
+              <Plus className="w-4 h-4 mr-1.5" /> Forge Hero
+            </Button>
+          </DialogTrigger>
           <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto bg-card border border-border shadow-2xl rounded-md">
             <DialogHeader>
               <DialogTitle className="font-serif text-3xl text-primary font-bold tracking-wide border-b border-border/30 pb-2">
@@ -420,32 +425,53 @@ export default function Dashboard() {
                 <button 
                   key={char.id} 
                   onClick={() => setLocation(`/characters/${char.id}`)}
-                  className="w-full text-left rounded-md border border-border/50 bg-card/60 backdrop-blur hover:border-primary/60 transition-colors duration-250 cursor-pointer group"
+                  className="w-full text-left rounded-lg border border-border/40 bg-card/45 backdrop-blur-md hover:border-primary/40 hover:shadow-[0_0_15px_rgba(var(--primary),0.05)] hover:scale-[1.01] transition-all duration-300 cursor-pointer group relative overflow-hidden"
                 >
-                  <div className="p-5 flex items-center justify-between gap-4">
+                  {/* Subtle top border glow on hover */}
+                  <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-primary/0 to-transparent group-hover:via-primary/50 transition-all duration-300" />
+                  
+                  <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4 flex-1 min-w-0">
-                      {/* Character Avatar Portrait */}
-                      <div className="w-12 h-12 rounded-full overflow-hidden border border-border/60 bg-background/40 flex-shrink-0 flex items-center justify-center">
+                      {/* Character Avatar Portrait with Rank Gradient fallback */}
+                      <div className={`w-12 h-12 rounded-full overflow-hidden border border-border/60 bg-background/40 flex-shrink-0 flex items-center justify-center relative shadow-inner ${
+                        !char.avatar ? (
+                          char.rank === "Iron" ? "bg-slate-700/20 border-slate-500/20"
+                          : char.rank === "Bronze" ? "bg-amber-700/20 border-amber-600/35"
+                          : char.rank === "Silver" ? "bg-zinc-500/20 border-zinc-400/30"
+                          : "bg-yellow-600/20 border-yellow-500/40"
+                        ) : ""
+                      }`}>
                         {char.avatar ? (
                           <img src={char.avatar} alt={char.name} className="w-full h-full object-cover" />
                         ) : (
-                          <span className="text-muted-foreground text-xs font-bold uppercase">{char.name.substring(0, 2)}</span>
+                          <span className={`text-xs font-bold uppercase tracking-wider ${
+                            char.rank === "Gold" ? "text-yellow-400 font-serif" : "text-muted-foreground font-mono"
+                          }`}>{char.name.substring(0, 2)}</span>
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 space-y-1">
                         <h3 className="font-serif text-lg font-bold text-foreground group-hover:text-primary transition-colors truncate">
                           {char.name}
                         </h3>
-                        <p className="text-xs text-muted-foreground uppercase tracking-widest mt-0.5 truncate">
+                        <p className="text-[10px] text-muted-foreground/80 uppercase tracking-widest font-semibold font-mono truncate">
                           {char.race} · {char.rank}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xl font-bold font-mono text-foreground leading-tight">
-                        {char.currentHp}<span className="text-xs text-muted-foreground font-normal">/{char.maxHp}</span>
+                    <div className="flex flex-col gap-1.5 sm:text-right min-w-[120px]">
+                      <div className="flex justify-between sm:justify-end items-baseline gap-1">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold sm:hidden">Health</span>
+                        <span className="text-xl font-bold font-mono text-foreground leading-none">
+                          {char.currentHp}<span className="text-xs text-muted-foreground font-normal">/{char.maxHp}</span>
+                        </span>
                       </div>
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Health (HP)</div>
+                      {/* Roster Card HP Progress Bar */}
+                      <div className="w-full bg-background/50 h-1.5 rounded-full overflow-hidden border border-border/20">
+                        <div 
+                          className="h-full bg-gradient-to-r from-red-600 to-red-500 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.max(0, Math.min(100, (char.currentHp / char.maxHp) * 100))}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -520,9 +546,9 @@ export default function Dashboard() {
               ) : recaps && recaps.length > 0 ? (
                 <div className="divide-y divide-border/20 max-h-[500px] overflow-y-auto pr-1">
                   {recaps.map(recap => (
-                    <div key={recap.id} className="p-4 hover:bg-accent/5 transition-colors group relative">
+                    <div key={recap.id} className="p-4 hover:bg-primary/[0.02] border-l-2 border-transparent hover:border-primary/50 transition-all duration-200 group relative">
                       <div className="flex justify-between items-start mb-1.5 pr-6">
-                        <span className="font-serif font-bold text-sm text-foreground leading-tight">{recap.title}</span>
+                        <span className="font-serif font-bold text-sm text-foreground leading-tight tracking-wide group-hover:text-primary transition-colors">{recap.title}</span>
                         <span className="text-[9px] text-muted-foreground whitespace-nowrap ml-2">
                           {format(new Date(recap.createdAt), "MMM d, yyyy")}
                         </span>
