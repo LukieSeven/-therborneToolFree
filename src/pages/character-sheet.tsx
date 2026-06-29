@@ -931,6 +931,7 @@ export default function CharacterSheet() {
     handleRoll(customFormula.trim(), rollLabel || "Custom Roll");
   };
 
+
   const handleChainRoll = () => {
     if (!critChain) return;
     const { chainDie, runningDiceTotal, modifier, label, chainCount, rolls: prevRolls } = critChain;
@@ -973,7 +974,7 @@ export default function CharacterSheet() {
     const val = Number(skill.value) || 0;
     const train = Number(skill.training) || 0;
     const modifier = Math.floor(val / 3) + train;
-    handleRoll(getDiceLabel(val), `${skill.name} Skill Roll`, undefined, modifier);
+    handleRoll(getDiceLabel(val), `${skill.name} Skill Roll`, val, modifier);
   };
 
   const handleWeaponRoll = (item: Equipment) => {
