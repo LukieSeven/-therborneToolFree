@@ -214,6 +214,11 @@ export default function CharacterSheet() {
   const [mana, setMana] = useState<number | null>(null);
   const [currentDt, setCurrentDt] = useState<number | null>(null);
 
+  // ── Combat Tracker State ──────────────────────────────────
+  const [combatants, setCombatants] = useState<Combatant[]>([]);
+  const [currentTurnIdx, setCurrentTurnIdx] = useState<number>(0);
+  const [recentCombatants, setRecentCombatants] = useState<Omit<Combatant, "id">[]>([]);
+
   useEffect(() => {
     if (character) {
       if (hp === null) setHp(character.currentHp);
@@ -382,9 +387,6 @@ export default function CharacterSheet() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [noteImages, setNoteImages] = useState<string[]>([]);
-  const [combatants, setCombatants] = useState<Combatant[]>([]);
-  const [currentTurnIdx, setCurrentTurnIdx] = useState<number>(0);
-  const [recentCombatants, setRecentCombatants] = useState<Omit<Combatant, "id">[]>([]);
 
   // ── Inventory Dialog Trigger State ────────────────────────
   const [isInvOpen, setIsInvOpen] = useState(false);
