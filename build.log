@@ -1,0 +1,31 @@
+
+> the-grimoire@1.0.0 build
+> vite build
+
+[36mvite v7.3.6 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 44 modules transformed.
+[31m✗[39m Build failed in 523ms
+[31merror during build:
+[31m[vite:esbuild] Transform failed with 1 error:
+/home/runner/work/-therborneToolFree/-therborneToolFree/src/pages/character-sheet.tsx:3672:19: ERROR: Unexpected ")"[31m
+file: [36m/home/runner/work/-therborneToolFree/-therborneToolFree/src/pages/character-sheet.tsx:3672:19[31m
+[33m
+[33mUnexpected ")"[33m
+3670 |                        </div>
+3671 |                      );
+3672 |                    })}
+     |                     ^
+3673 |  
+3674 |                    {/* Unassigned Group */}
+[31m
+    at failureErrorWithLog (/home/runner/work/-therborneToolFree/-therborneToolFree/node_modules/esbuild/lib/main.js:1748:15)
+    at /home/runner/work/-therborneToolFree/-therborneToolFree/node_modules/esbuild/lib/main.js:1017:50
+    at responseCallbacks.<computed> (/home/runner/work/-therborneToolFree/-therborneToolFree/node_modules/esbuild/lib/main.js:884:9)
+    at handleIncomingPacket (/home/runner/work/-therborneToolFree/-therborneToolFree/node_modules/esbuild/lib/main.js:939:12)
+    at Socket.readFromStdout (/home/runner/work/-therborneToolFree/-therborneToolFree/node_modules/esbuild/lib/main.js:862:7)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)[39m
