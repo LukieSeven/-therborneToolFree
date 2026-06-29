@@ -24,7 +24,7 @@ import {
   useListCurrencies, useUpdateCurrency, useDeleteCurrency,
   useListInventory, useUpdateInventoryItem, useDeleteInventoryItem,
   useListEssences, useAddEssence, useDeleteEssence,
-  useListAbilities, useUpdateAbility,
+  useListAbilities, useUpdateAbility, useDeleteAbility,
   useListSkills, useUpdateSkill,
   useListNotes, useCreateNote, useUpdateNote, useDeleteNote,
   getGetCharacterQueryKey, getListCharacterRollsQueryKey, getListNotesQueryKey
@@ -43,6 +43,7 @@ import { EditAbilitiesDialog } from "@/components/dialogs/edit-abilities-dialog"
 import { EditSkillsDialog } from "@/components/dialogs/edit-skills-dialog";
 import { EditInventoryDialog } from "@/components/dialogs/edit-inventory-dialog";
 import { CustomizeToolDialog } from "@/components/dialogs/customize-tool-dialog";
+import { EditItemAbilityDialog } from "@/components/dialogs/edit-item-ability-dialog";
 
 const STATS = [
   { key: "power",     label: "POW", desc: "Physical strength & raw force" },
@@ -178,6 +179,7 @@ export default function CharacterSheet() {
   const { data: notes = [] } = useListNotes(id);
 
   // Mutations
+  const deleteAbility = useDeleteAbility();
   const updateChar = useUpdateCharacter();
   const deleteChar = useDeleteCharacter();
   const createRoll = useCreateRoll();
@@ -394,6 +396,11 @@ export default function CharacterSheet() {
   const [invType, setInvType] = useState<"currency" | "equipment" | "item">("item");
   const [invInitialData, setInvInitialData] = useState<any>(null);
 
+  // ── Item Ability Dialog State ──
+  const [isItemAbOpen, setIsItemAbOpen] = useState(false);
+  const [itemAbEquipmentId, setItemAbEquipmentId] = useState<number | null>(null);
+  const [itemAbInitialData, setItemAbInitialData] = useState<any>(null);
+
   // ── Essence input State ───────────────────────────────────
   const [essenceSlotInput, setEssenceSlotInput] = useState<number | null>(null);
   const [essenceName, setEssenceName] = useState("");
@@ -484,13 +491,14 @@ export default function CharacterSheet() {
       const item = equipment.find(e => e.id === Number(slot.targetId));
       if (item) {
         name = item.name;
-        costStr = item.modifier !== undefined ? `${item.modifier >= 0 ? "+" : ""}${item.modifier} Mod` : "";
+        costStr = item.modifier !== undefined ? (typeof item.modifier === "number" ? `${item.modifier >= 0 ? "+" : ""}${item.modifier} Mod` : `${item.modifier} Mod`) : "";
         statStr = item.diceType || "d8";
       }
     } else if (slot.type === "ability") {
       const ability = abilities.find(a => a.id === Number(slot.targetId));
       if (ability) {
-        name = ability.name;
+        const eq = ability.equipmentId ? equipment.find(e => e.id === ability.equipmentId) : null;
+        name = eq ? `${eq.name}: ${ability.name}` : ability.name;
         costStr = `${ability.cost} MP`;
         statStr = ability.linkedStat ? String(ability.linkedStat).toUpperCase().substring(0, 3) : "SPI";
       }
@@ -911,10 +919,22 @@ export default function CharacterSheet() {
 
   const handleWeaponRoll = (item: Equipment) => {
     const dice = item.diceType || "d8";
-    const statMod = autoModifiers.power || 0;
-    const flatMod = item.modifier || 0;
-    const totalMod = statMod + flatMod;
-    handleRoll(dice, `${item.name} Strike`, border => {}, totalMod);
+    let formula = dice;
+    let flatMod = 0;
+    
+    if (item.modifier !== undefined && String(item.modifier).trim() !== "") {
+      const modStr = String(item.modifier).trim();
+      const hasLetters = /[a-zA-Z]/.test(modStr);
+      if (hasLetters) {
+        formula = `${dice} + ${modStr}`;
+      } else {
+        flatMod = parseInt(modStr, 10) || 0;
+      }
+    } else {
+      formula = `${dice} + powr`;
+    }
+
+    handleRoll(formula, `${item.name} Strike`, undefined, flatMod);
   };
 
   const handleAbilityRoll = (ability: Ability, chosenStat?: string) => {
@@ -945,9 +965,34 @@ export default function CharacterSheet() {
       }
 
       // Sum all equipped equipment flat modifiers (e.g. +6 Mace)
+      const vars: Record<string, number> = {
+        power, vitality, spirit, agility, endurance, precision, willpower, charisma,
+        pow: power, vit: vitality, spi: spirit, agi: agility, end: endurance, pre: precision, wil: willpower, cha: charisma,
+        powr: autoModifiers.power,
+        vitr: autoModifiers.vitality,
+        spir: autoModifiers.spirit,
+        agir: autoModifiers.agility,
+        endr: autoModifiers.endurance,
+        prer: autoModifiers.precision,
+        wilr: autoModifiers.willpower,
+        char: autoModifiers.charisma,
+      };
+
       const eqMod = equipment
         .filter(e => e.equipped)
-        .reduce((sum, item) => sum + (item.modifier || 0), 0);
+        .reduce((sum, item) => {
+          let modVal = 0;
+          if (item.modifier !== undefined && String(item.modifier).trim() !== "") {
+            const modStr = String(item.modifier).trim();
+            const hasLetters = /[a-zA-Z]/.test(modStr);
+            if (hasLetters) {
+              modVal = evaluateFormula(modStr, vars);
+            } else {
+              modVal = parseInt(modStr, 10) || 0;
+            }
+          }
+          return sum + modVal;
+        }, 0);
 
       const totalMod = statMod + eqMod;
       handleRoll(rollFormulaToUse, `${ability.name} Cast`, undefined, totalMod);
@@ -1149,6 +1194,18 @@ export default function CharacterSheet() {
     setInvMode("edit");
     setInvInitialData(item);
     setIsInvOpen(true);
+  };
+
+  const triggerAddItemAbility = (eqId: number) => {
+    setItemAbEquipmentId(eqId);
+    setItemAbInitialData(null);
+    setIsItemAbOpen(true);
+  };
+
+  const triggerEditItemAbility = (ability: Ability) => {
+    setItemAbEquipmentId(ability.equipmentId || null);
+    setItemAbInitialData(ability);
+    setIsItemAbOpen(true);
   };
 
   const triggerDiscardItem = (item: any) => {
@@ -2283,11 +2340,11 @@ export default function CharacterSheet() {
                 )}
 
                 {/* Shaped Spells */}
-                {abilities.length > 0 && (
+                {abilities.filter(ab => !ab.equipmentId).length > 0 && (
                   <div>
                     <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Shaped Spells</h4>
                     <div className="flex flex-wrap gap-1.5">
-                      {abilities.map(ab => (
+                      {abilities.filter(ab => !ab.equipmentId).map(ab => (
                         <Button 
                           key={ab.id} variant="outline" size="sm" className="h-6 text-[10px] rounded-none font-serif"
                           onClick={() => handleAssignFavorite(assigningSlotIndex!, "ability", ab.id, ab.name)}
@@ -2295,6 +2352,27 @@ export default function CharacterSheet() {
                           {ab.name}
                         </Button>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Item Abilities */}
+                {abilities.filter(ab => ab.equipmentId).length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border/10 pb-0.5">Item Abilities</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {abilities.filter(ab => ab.equipmentId).map(ab => {
+                        const eq = equipment.find(e => e.id === ab.equipmentId);
+                        const displayName = eq ? `${eq.name}: ${ab.name}` : ab.name;
+                        return (
+                          <Button 
+                            key={ab.id} variant="outline" size="sm" className="h-6 text-[10px] rounded-none font-serif"
+                            onClick={() => handleAssignFavorite(assigningSlotIndex!, "ability", ab.id, displayName)}
+                          >
+                            {displayName}
+                          </Button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -2617,6 +2695,67 @@ export default function CharacterSheet() {
                             </div>
                           )}
 
+                          {/* Item Linked Abilities list */}
+                          <div className="border-t border-border/20 pt-2 mt-2 space-y-2">
+                            <div className="flex justify-between items-center text-[10px] uppercase font-bold text-primary tracking-wider">
+                              <span>Item Abilities</span>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-5 text-[9px] text-primary hover:bg-primary/10 px-1.5 py-0 cursor-pointer rounded-none"
+                                onClick={() => triggerAddItemAbility(eq.id)}
+                              >
+                                <Plus className="w-2.5 h-2.5 mr-0.5" /> Add Ability
+                              </Button>
+                            </div>
+                            {abilities.filter(a => a.equipmentId === eq.id).length > 0 ? (
+                              <div className="space-y-1.5">
+                                {abilities.filter(a => a.equipmentId === eq.id).map(ab => (
+                                  <div key={ab.id} className="flex justify-between items-center bg-background/30 p-2 border border-border/10 group/ab">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-serif text-xs font-bold text-foreground flex items-center gap-1.5">
+                                        {ab.name}
+                                        {ab.cost > 0 && <span className="text-[9px] text-blue-400 font-mono">({ab.cost} MP)</span>}
+                                      </div>
+                                      {ab.description && <p className="text-[10px] text-muted-foreground/80 font-serif line-clamp-1">{ab.description}</p>}
+                                      {ab.rollFormula && <p className="text-[9px] text-muted-foreground/60 font-mono mt-0.5">Formula: {ab.rollFormula}</p>}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      {ab.rollFormula && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-6 text-[9px] font-serif border-primary/20 text-primary hover:bg-primary/15 px-2 rounded-none cursor-pointer"
+                                          onClick={() => handleAbilityRoll(ab)}
+                                        >
+                                          Roll
+                                        </Button>
+                                      )}
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-5 w-5 text-primary opacity-0 group-hover/ab:opacity-100 transition-opacity rounded-none cursor-pointer" 
+                                        onClick={() => triggerEditItemAbility(ab)}
+                                      >
+                                        <Edit2 className="w-2.5 h-2.5" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-5 w-5 text-destructive opacity-0 group-hover/ab:opacity-100 transition-opacity rounded-none cursor-pointer" 
+                                        onClick={() => deleteAbility.mutate({ id: ab.id })}
+                                      >
+                                        <Trash2 className="w-2.5 h-2.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[10px] text-muted-foreground/50 italic">No abilities attached.</p>
+                            )}
+                          </div>
+
                           <div className="flex items-center justify-between border-t border-border/30 pt-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
                             <label className="flex items-center gap-1 cursor-pointer">
                               <input
@@ -2708,6 +2847,14 @@ export default function CharacterSheet() {
               mode={invMode}
               type={invType}
               initialData={invInitialData}
+            />
+
+            <EditItemAbilityDialog
+              isOpen={isItemAbOpen}
+              onOpenChange={setIsItemAbOpen}
+              characterId={id}
+              equipmentId={itemAbEquipmentId}
+              initialData={itemAbInitialData}
             />
           </div>
         )}
@@ -2948,7 +3095,7 @@ export default function CharacterSheet() {
                 return { slotNum, ess, label, abilities: attachedAbilities };
               });
 
-              const unassignedAbilities = abilities?.filter(a => !a.essenceId || !essences?.some(e => e.id === a.essenceId)) || [];
+              const unassignedAbilities = abilities?.filter(a => (!a.essenceId || !essences?.some(e => e.id === a.essenceId)) && !a.equipmentId) || [];
 
               return (
                 <div className="space-y-6">

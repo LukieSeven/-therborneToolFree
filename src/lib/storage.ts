@@ -100,7 +100,7 @@ export interface Equipment {
   dtBonus: number;
   statModifiers: Record<string, number>;
   diceType?: string;
-  modifier?: number;
+  modifier?: string | number;
 }
 
 export interface Currency {
@@ -154,6 +154,7 @@ export interface Ability {
   essenceId?: number | null;
   resistances?: string;
   immunities?: string;
+  equipmentId?: number | null;
 }
 
 export interface Skill {
@@ -943,7 +944,8 @@ const DEFAULT_ABILITY: Omit<Ability, "id" | "characterId" | "name"> = {
   bonusDt: "",
   essenceId: null,
   resistances: "",
-  immunities: ""
+  immunities: "",
+  equipmentId: null
 };
 
 const DEFAULT_SKILL: Omit<Skill, "id" | "characterId" | "name"> = {

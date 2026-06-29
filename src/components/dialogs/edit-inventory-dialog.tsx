@@ -42,7 +42,7 @@ export function EditInventoryDialog({ characterId, isOpen, onOpenChange, mode, t
   // Equipment State
   const [dtBonus, setDtBonus] = useState(0);
   const [diceType, setDiceType] = useState("");
-  const [modifier, setModifier] = useState(0);
+  const [modifier, setModifier] = useState("");
   const [equipped, setEquipped] = useState(false);
   const [assignedToQuickRolls, setAssignedToQuickRolls] = useState(false);
   
@@ -59,7 +59,7 @@ export function EditInventoryDialog({ characterId, isOpen, onOpenChange, mode, t
         setQuantity(initialData.quantity || 1);
         setDtBonus(initialData.dtBonus || 0);
         setDiceType(initialData.diceType || "");
-        setModifier(initialData.modifier || 0);
+        setModifier(initialData.modifier !== undefined ? String(initialData.modifier) : "");
         setEquipped(!!initialData.equipped);
         setAssignedToQuickRolls(!!initialData.assignedToQuickRolls);
         setStatModifiers(initialData.statModifiers || {});
@@ -71,7 +71,7 @@ export function EditInventoryDialog({ characterId, isOpen, onOpenChange, mode, t
         setQuantity(1);
         setDtBonus(0);
         setDiceType("");
-        setModifier(0);
+        setModifier("");
         setEquipped(false);
         setAssignedToQuickRolls(false);
         setStatModifiers({});
@@ -118,7 +118,7 @@ export function EditInventoryDialog({ characterId, isOpen, onOpenChange, mode, t
           dtBonus,
           statModifiers,
           diceType: diceType || undefined,
-          modifier: diceType ? modifier : 0,
+          modifier: diceType ? modifier : "",
         }, { onSuccess: () => onOpenChange(false) });
       } else if (mode === "edit" && initialData) {
         updateEquipment.mutate({
@@ -131,7 +131,7 @@ export function EditInventoryDialog({ characterId, isOpen, onOpenChange, mode, t
             dtBonus,
             statModifiers,
             diceType: diceType || undefined,
-            modifier: diceType ? modifier : 0,
+            modifier: diceType ? modifier : "",
           },
         }, { onSuccess: () => onOpenChange(false) });
       }
@@ -205,8 +205,8 @@ export function EditInventoryDialog({ characterId, isOpen, onOpenChange, mode, t
 
               {diceType && (
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Flat Weapon Modifier (e.g. +2)</label>
-                  <Input type="number" value={modifier} onChange={e => setModifier(Number(e.target.value))} required className="bg-background font-mono" />
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Weapon Modifier (e.g. +2, POWr+6, prer+2)</label>
+                  <Input value={modifier} onChange={e => setModifier(e.target.value)} required className="bg-background font-mono" />
                 </div>
               )}
 
