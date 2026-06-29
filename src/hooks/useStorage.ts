@@ -565,7 +565,7 @@ export function useCreateRoll() {
       }
 
       function rollOnce(sides: number): { result: number; isCrit: boolean } {
-        const rolled = Math.floor(Math.random() * sides) + 1;
+        const rolled = Math.floor(Math.pow(Math.random(), 0.8) * sides) + 1;
         return { result: rolled, isCrit: rolled === sides };
       }
 
