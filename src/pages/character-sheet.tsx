@@ -442,7 +442,7 @@ export default function CharacterSheet() {
     modifier: number;
     label: string;
     lastRolledValue: number;
-    rolls: string[];
+    rolls: { label: string; breakdown: string; total: number }[];
   } | null>(null);
 
   const [lastRoll, setLastRoll] = useState<{
@@ -453,7 +453,7 @@ export default function CharacterSheet() {
     maxChainCount: number;
     diceType: string;
     label: string;
-    rolls?: string[];
+    rolls?: { label: string; breakdown: string; total: number }[];
   } | null>(null);
 
   if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -905,7 +905,16 @@ export default function CharacterSheet() {
             });
 
             if (wasCrit) {
-              setCritChain({ chainCount: 0, chainDie, runningDiceTotal: rolled, modifier, label: lbl, lastRolledValue: rolled, rolls: [`${rolled}!`] });
+              const breakdownStr = modifier !== 0 ? (modifier > 0 ? `${rolled}!+${modifier}` : `${rolled}!-${Math.abs(modifier)}`) : `${rolled}!`;
+              setCritChain({
+                chainCount: 0,
+                chainDie,
+                runningDiceTotal: rolled,
+                modifier,
+                label: lbl,
+                lastRolledValue: rolled,
+                rolls: [{ label: "Roll 1", breakdown: breakdownStr, total: rolled + modifier }]
+              });
             } else {
               setLastRoll({ rawRoll: rolled, modifier, total: rolled + modifier, hadCrit: false, maxChainCount: -1, diceType: data.diceType, label: lbl });
             }
@@ -936,10 +945,14 @@ export default function CharacterSheet() {
             const wasCrit = (data as any).isCrit ?? false;
             const newTotal = runningDiceTotal + rolled;
             
+            const breakdownStr = rolled + (wasCrit ? "!" : "");
+            const rollTotal = rolled;
+            const newRolls = [...critChain.rolls, { label: `Roll ${chainCount + 2}`, breakdown: breakdownStr, total: rollTotal }];
+
             if (wasCrit) {
-              setCritChain({ chainCount: chainCount + 1, chainDie, runningDiceTotal: newTotal, modifier, label, lastRolledValue: rolled, rolls: [...critChain.rolls, `${rolled}!`] });
+              setCritChain({ chainCount: chainCount + 1, chainDie, runningDiceTotal: newTotal, modifier, label, lastRolledValue: rolled, rolls: newRolls });
             } else {
-              setLastRoll({ rawRoll: newTotal, modifier, total: newTotal + modifier, hadCrit: true, maxChainCount: chainCount, diceType: chainDie, label, rolls: [...critChain.rolls, String(rolled)] });
+              setLastRoll({ rawRoll: newTotal, modifier, total: newTotal + modifier, hadCrit: true, maxChainCount: chainCount, diceType: chainDie, label, rolls: newRolls });
               setCritChain(null);
             }
             setRollingDice(null);
@@ -2238,30 +2251,28 @@ export default function CharacterSheet() {
                 {rollingDice ? (
                   <Dice5 className="w-10 h-10 animate-spin text-emerald-400 opacity-75 drop-shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
                 ) : critChain ? (
-                  <div className="animate-in zoom-in duration-200 w-full font-mono text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.4)]">
-                    <p className="text-[10px] uppercase tracking-[0.25em] mb-2 font-bold animate-pulse" style={{ color: tier!.color }}>
-                      ✦ {tier!.name} — Crit #{critChain.chainCount + 1} ✦
+                  <div className="animate-in zoom-in duration-200 w-full font-mono text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.4)] space-y-4">
+                    <p className="text-[11px] uppercase tracking-[0.25em] mb-2 font-bold animate-pulse text-center" style={{ color: tier!.color }}>
+                      ✦ {tier!.name} — Crit! ✦
                     </p>
-                    <div className="mb-1">
-                      <span className="text-[10px] text-emerald-500/60 block uppercase tracking-wider">Rolled</span>
-                      <span className="text-4xl font-bold" style={{ color: tier!.color }}>{critChain.lastRolledValue}</span>
-                      <span className="text-[10px] uppercase tracking-wider block mt-0.5" style={{ color: tier!.color + "aa" }}>
-                        {critChain.chainDie} — Max!
-                      </span>
-                    </div>
-                    <div className="space-y-1 my-2 max-w-[80%] mx-auto border-t border-b border-emerald-950/20 py-1.5">
+                    
+                    <div className="space-y-4 my-2 max-w-[90%] mx-auto text-center">
                       {critChain.rolls.map((r, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-xs">
-                          <span className="text-emerald-500/50 uppercase text-[9px] tracking-wider">Roll {idx + 1}</span>
-                          <span className="font-bold text-emerald-300" style={{ color: r.includes("!") ? tier!.color : undefined }}>{r}</span>
+                        <div key={idx} className="space-y-0.5">
+                          <div className="text-[9px] text-emerald-500/40 uppercase tracking-widest">
+                            {r.label}
+                          </div>
+                          <div className="text-xs font-semibold text-emerald-300/80 font-mono">
+                            {r.breakdown}
+                          </div>
+                          <div className="text-3xl font-bold font-serif leading-none mt-1" style={{ color: tier!.color }}>
+                            {r.total}
+                          </div>
                         </div>
                       ))}
                     </div>
-                    <div className="my-1 px-3 py-0.5 rounded border border-emerald-950 bg-emerald-950/20 inline-block text-xs text-emerald-500/75">
-                      Running: {critChain.runningDiceTotal}
-                      {critChain.modifier !== 0 && <span className="text-emerald-400"> +{critChain.modifier}</span>}
-                    </div>
-                    <div className="mt-2">
+
+                    <div className="mt-2 text-center">
                       <button
                         onClick={handleChainRoll}
                         disabled={!!rollingDice}
@@ -2287,11 +2298,18 @@ export default function CharacterSheet() {
                       <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500/60 mb-2 font-semibold">{lastRoll.label}</p>
                     )}
                     {lastRoll.hadCrit && lastRoll.rolls && lastRoll.rolls.length > 0 ? (
-                      <div className="space-y-1 my-2 max-w-[80%] mx-auto border-t border-b border-emerald-950/20 py-1.5">
+                      <div className="space-y-4 my-2 max-w-[90%] mx-auto text-center">
                         {lastRoll.rolls.map((r, idx) => (
-                          <div key={idx} className="flex justify-between items-center text-xs">
-                            <span className="text-emerald-500/50 uppercase text-[9px] tracking-wider">Roll {idx + 1}</span>
-                            <span className="font-bold text-emerald-300" style={{ color: r.includes("!") ? (finalTier?.color ?? "#ffd700") : undefined }}>{r}</span>
+                          <div key={idx} className="space-y-0.5">
+                            <div className="text-[9px] text-emerald-500/40 uppercase tracking-widest">
+                              {r.label}
+                            </div>
+                            <div className="text-xs font-semibold text-emerald-300/80 font-mono">
+                              {r.breakdown}
+                            </div>
+                            <div className="text-2xl font-bold font-serif leading-none mt-1" style={{ color: finalTier?.color ?? "#ffd700" }}>
+                              {r.total}
+                            </div>
                           </div>
                         ))}
                       </div>

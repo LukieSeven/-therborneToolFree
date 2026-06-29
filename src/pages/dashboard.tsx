@@ -578,7 +578,12 @@ export default function Dashboard() {
           </Card>
         </div>
 
-      </div>
+      {/* Tucked away footer */}
+      <footer className="mt-12 mb-4 border-t border-border/20 pt-4 text-center">
+        <p className="text-[10px] font-mono text-muted-foreground/30 hover:text-muted-foreground/80 transition-colors tracking-widest uppercase">
+          Lovingly crafted by LukieSeven — Mark 46
+        </p>
+      </footer>
     </div>
   );
 }
