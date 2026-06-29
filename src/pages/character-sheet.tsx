@@ -417,6 +417,7 @@ export default function CharacterSheet() {
   const [rollMod, setRollMod] = useState("0");
   const [rollLabel, setRollLabel] = useState("");
   const [rollingDice, setRollingDice] = useState<string | null>(null);
+  const [customFormula, setCustomFormula] = useState("");
   
   const [critChain, setCritChain] = useState<{
     chainCount: number;
@@ -844,7 +845,27 @@ export default function CharacterSheet() {
   // ── Dice rolling handlers ─────────────────────────────────
   const handleRoll = (diceType: string, label?: string, statValue?: number, autoModifier?: number) => {
     const rollKey = label || diceType;
-    const modifier = autoModifier !== undefined ? autoModifier : (parseInt(rollMod) || 0);
+    const varsForMod = {
+      power: finalStats.power, pow: finalStats.power,
+      vitality: finalStats.vitality, vit: finalStats.vitality,
+      spirit: finalStats.spirit, spi: finalStats.spirit,
+      agility: finalStats.agility, agi: finalStats.agility,
+      endurance: finalStats.endurance, end: finalStats.endurance,
+      precision: finalStats.precision, pre: finalStats.precision,
+      willpower: finalStats.willpower, wil: finalStats.willpower,
+      charisma: finalStats.charisma, cha: finalStats.charisma,
+      powr: autoModifiers.power,
+      vitr: autoModifiers.vitality,
+      spir: autoModifiers.spirit,
+      agir: autoModifiers.agility,
+      endr: autoModifiers.endurance,
+      prer: autoModifiers.precision,
+      wilr: autoModifiers.willpower,
+      char: autoModifiers.charisma,
+    };
+    const modifier = autoModifier !== undefined 
+      ? autoModifier 
+      : (/[a-zA-Z]/.test(rollMod) ? evaluateFormula(rollMod, varsForMod) : (parseInt(rollMod, 10) || 0));
     setRollingDice(rollKey);
     setLastRoll(null);
     setCritChain(null);
@@ -868,7 +889,7 @@ export default function CharacterSheet() {
             if (wasCrit) {
               setCritChain({ chainCount: 0, chainDie, runningDiceTotal: rolled, modifier, label: lbl, lastRolledValue: rolled });
             } else {
-              setLastRoll({ rawRoll: rolled, modifier, total: rolled + modifier, hadCrit: false, maxChainCount: -1, diceType, label: lbl });
+              setLastRoll({ rawRoll: rolled, modifier, total: rolled + modifier, hadCrit: false, maxChainCount: -1, diceType: data.diceType, label: lbl });
             }
             setRollingDice(null);
           }, 600);
@@ -876,6 +897,11 @@ export default function CharacterSheet() {
         onError: () => setRollingDice(null),
       }
     );
+  };
+
+  const handleCustomFormulaRoll = () => {
+    if (!customFormula.trim()) return;
+    handleRoll(customFormula.trim(), rollLabel || "Custom Roll");
   };
 
   const handleChainRoll = () => {
@@ -966,8 +992,22 @@ export default function CharacterSheet() {
 
       // Sum all equipped equipment flat modifiers (e.g. +6 Mace)
       const vars: Record<string, number> = {
-        power, vitality, spirit, agility, endurance, precision, willpower, charisma,
-        pow: power, vit: vitality, spi: spirit, agi: agility, end: endurance, pre: precision, wil: willpower, cha: charisma,
+        power: finalStats.power,
+        vitality: finalStats.vitality,
+        spirit: finalStats.spirit,
+        agility: finalStats.agility,
+        endurance: finalStats.endurance,
+        precision: finalStats.precision,
+        willpower: finalStats.willpower,
+        charisma: finalStats.charisma,
+        pow: finalStats.power,
+        vit: finalStats.vitality,
+        spi: finalStats.spirit,
+        agi: finalStats.agility,
+        end: finalStats.endurance,
+        pre: finalStats.precision,
+        wil: finalStats.willpower,
+        cha: finalStats.charisma,
         powr: autoModifiers.power,
         vitr: autoModifiers.vitality,
         spir: autoModifiers.spirit,
@@ -1119,7 +1159,7 @@ export default function CharacterSheet() {
               if (wasCrit) {
                 setCritChain({ chainCount: 0, chainDie, runningDiceTotal: rolled, modifier: 0, label: `Fam: ${ability.name} Cast`, lastRolledValue: rolled });
               } else {
-                setLastRoll({ rawRoll: rolled, modifier: 0, total: rolled, hadCrit: false, maxChainCount: -1, diceType: ability.rollFormula, label: `Fam: ${ability.name} Cast` });
+                setLastRoll({ rawRoll: rolled, modifier: 0, total: rolled, hadCrit: false, maxChainCount: -1, diceType: data.diceType, label: `Fam: ${ability.name} Cast` });
               }
               setRollingDice(null);
             }, 600);
@@ -2056,10 +2096,11 @@ export default function CharacterSheet() {
                         className="bg-background/50 border-border/50 text-xs h-7 flex-1 rounded-none"
                       />
                       <Input
-                        type="number"
+                        type="text"
                         value={rollMod}
                         onChange={e => setRollMod(e.target.value)}
-                        className="bg-background/50 border-border/50 text-center font-mono text-xs h-7 w-14 flex-shrink-0 rounded-none"
+                        placeholder="Mod / Formula (e.g. POWr*3)"
+                        className="bg-background/50 border-border/50 text-center font-mono text-xs h-7 w-48 flex-shrink-0 rounded-none text-ellipsis overflow-hidden"
                       />
                     </div>
                     <div className="grid grid-cols-4 gap-1">
@@ -2075,6 +2116,26 @@ export default function CharacterSheet() {
                           {d}
                         </Button>
                       ))}
+                    </div>
+
+                    <div className="space-y-1.5 border-t border-border/10 pt-2.5">
+                      <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-left">Custom Formula</div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={customFormula}
+                          onChange={e => setCustomFormula(e.target.value)}
+                          placeholder="e.g. 2d6 + POWr*3"
+                          className="bg-background/50 border-border/50 text-xs h-7 flex-1 rounded-none font-mono"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleCustomFormulaRoll}
+                          disabled={!customFormula.trim() || !!rollingDice}
+                          className="h-7 text-xs font-serif rounded-none px-3 bg-primary text-primary-foreground cursor-pointer"
+                        >
+                          Roll
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2196,21 +2257,27 @@ export default function CharacterSheet() {
                     ) : (
                       <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500/60 mb-2 font-semibold">{lastRoll.label}</p>
                     )}
-                    <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
-                      <div className="text-center">
-                        <span className="text-[10px] text-emerald-500/50 block uppercase tracking-wider">Roll</span>
-                        <span className="text-2xl font-semibold text-emerald-300">{lastRoll.rawRoll}</span>
+                    {lastRoll.diceType && (lastRoll.diceType.includes("(") || lastRoll.diceType.includes("+") || lastRoll.diceType.includes("-") || lastRoll.diceType.includes("*")) ? (
+                      <div className="text-sm font-semibold text-emerald-300/90 mb-3 font-mono bg-emerald-950/30 py-1.5 px-3 border border-emerald-500/10 rounded inline-block max-w-[90%] mx-auto leading-normal">
+                        {lastRoll.diceType}
                       </div>
-                      {lastRoll.modifier !== 0 && (
-                        <>
-                          <span className="text-lg text-emerald-500/40 font-light mt-2">+</span>
-                          <div className="text-center">
-                            <span className="text-[10px] text-emerald-500/50 block uppercase tracking-wider">Mod</span>
-                            <span className="text-2xl font-semibold text-emerald-400">{lastRoll.modifier}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
+                        <div className="text-center">
+                          <span className="text-[10px] text-emerald-500/50 block uppercase tracking-wider">Roll</span>
+                          <span className="text-2xl font-semibold text-emerald-300">{lastRoll.rawRoll}</span>
+                        </div>
+                        {lastRoll.modifier !== 0 && (
+                          <>
+                            <span className="text-lg text-emerald-500/40 font-light mt-2">+</span>
+                            <div className="text-center">
+                              <span className="text-[10px] text-emerald-500/50 block uppercase tracking-wider">Mod</span>
+                              <span className="text-2xl font-semibold text-emerald-400">{lastRoll.modifier}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                     <div className="h-px w-24 mx-auto my-2"
                       style={{ background: finalTier ? finalTier.color + "60" : "rgba(16,185,129,0.2)" }} />
                     <div>
