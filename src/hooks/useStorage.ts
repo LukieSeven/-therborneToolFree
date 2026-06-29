@@ -700,16 +700,11 @@ export function useCreateRoll() {
         total = result + modifier;
         diceTypeStr = breakdown;
       } else if (statValue !== undefined) {
-        const diceSides = getStatDiceSides(statValue);
-        diceTypeStr = diceSides.map(d => `d${d}`).join("+");
-        let rollTotal = 0;
-        for (const sides of diceSides) {
-          const r = rollOnce(sides);
-          rollTotal += r.result;
-          if (r.isCrit) isCrit = true;
-        }
-        result = rollTotal;
-        total = rollTotal + modifier;
+        const { total: rolledSum, desc, isCrit: crit } = rollStatDice(statValue);
+        result = rolledSum;
+        total = rolledSum + modifier;
+        isCrit = crit;
+        diceTypeStr = desc;
       } else {
         const sides = parseInt(diceTypeStr.replace("d", ""), 10) || 20;
         const r = rollOnce(sides);

@@ -2251,28 +2251,21 @@ export default function CharacterSheet() {
                 {rollingDice ? (
                   <Dice5 className="w-10 h-10 animate-spin text-emerald-400 opacity-75 drop-shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
                 ) : critChain ? (
-                  <div className="animate-in zoom-in duration-200 w-full font-mono text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.4)] space-y-4">
+                  <div className="animate-in zoom-in duration-200 w-full font-mono text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.4)] space-y-3">
                     <p className="text-[11px] uppercase tracking-[0.25em] mb-2 font-bold animate-pulse text-center" style={{ color: tier!.color }}>
                       ✦ {tier!.name} — Crit! ✦
                     </p>
                     
-                    <div className="space-y-4 my-2 max-w-[90%] mx-auto text-center">
-                      {critChain.rolls.map((r, idx) => (
-                        <div key={idx} className="space-y-0.5">
-                          <div className="text-[9px] text-emerald-500/40 uppercase tracking-widest">
-                            {r.label}
-                          </div>
-                          <div className="text-xs font-semibold text-emerald-300/80 font-mono">
-                            {r.breakdown}
-                          </div>
-                          <div className="text-3xl font-bold font-serif leading-none mt-1" style={{ color: tier!.color }}>
-                            {r.total}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="text-sm font-semibold text-emerald-300/80 font-mono tracking-wide text-center">
+                      {critChain.rolls.map(r => r.breakdown).join(" + ")}
+                      {critChain.modifier !== 0 && (critChain.modifier > 0 ? ` + ${critChain.modifier}` : ` - ${Math.abs(critChain.modifier)}`)}
                     </div>
 
-                    <div className="mt-2 text-center">
+                    <div className="text-5xl font-bold font-serif my-1 text-center" style={{ color: tier!.color }}>
+                      {critChain.runningDiceTotal + critChain.modifier}
+                    </div>
+
+                    <div className="mt-3 text-center">
                       <button
                         onClick={handleChainRoll}
                         disabled={!!rollingDice}
@@ -2298,20 +2291,11 @@ export default function CharacterSheet() {
                       <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500/60 mb-2 font-semibold">{lastRoll.label}</p>
                     )}
                     {lastRoll.hadCrit && lastRoll.rolls && lastRoll.rolls.length > 0 ? (
-                      <div className="space-y-4 my-2 max-w-[90%] mx-auto text-center">
-                        {lastRoll.rolls.map((r, idx) => (
-                          <div key={idx} className="space-y-0.5">
-                            <div className="text-[9px] text-emerald-500/40 uppercase tracking-widest">
-                              {r.label}
-                            </div>
-                            <div className="text-xs font-semibold text-emerald-300/80 font-mono">
-                              {r.breakdown}
-                            </div>
-                            <div className="text-2xl font-bold font-serif leading-none mt-1" style={{ color: finalTier?.color ?? "#ffd700" }}>
-                              {r.total}
-                            </div>
-                          </div>
-                        ))}
+                      <div className="space-y-2 my-2 text-center">
+                        <div className="text-sm font-semibold text-emerald-300/80 font-mono tracking-wide">
+                          {lastRoll.rolls.map(r => r.breakdown).join(" + ")}
+                          {lastRoll.modifier !== 0 && (lastRoll.modifier > 0 ? ` + ${lastRoll.modifier}` : ` - ${Math.abs(lastRoll.modifier)}`)}
+                        </div>
                       </div>
                     ) : lastRoll.diceType && (lastRoll.diceType.includes("(") || lastRoll.diceType.includes("+") || lastRoll.diceType.includes("-") || lastRoll.diceType.includes("*")) ? (
                       <div className="text-sm font-semibold text-emerald-300/90 mb-3 font-mono bg-emerald-950/30 py-1.5 px-3 border border-emerald-500/10 rounded inline-block max-w-[90%] mx-auto leading-normal">
